@@ -1,0 +1,1177 @@
+---
+title: "Data Import NANS"
+author: "Teresa Del Bianco"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+# Load packages 
+
+```{r, message = FALSE, warning = FALSE, include = FALSE}
+packs <- c("R.matlab", "reshape2", "dplyr", "multidplyr", "ggplot2", "tidyr")
+lapply(packs, require, character.only = TRUE)
+```
+
+# Read data from matlab (? Hz)
+
+```{r}
+cbfnp_matlabFile  <- readMat('MatFiles/ph3_ET_popout_temporalScores_20191104T222852.mat')
+head(cbfnp_matlabFile)
+```
+
+# Trial 1
+
+```{r}
+datList <- cbfnp_matlabFile$temporal[[9]][[1]][,,1]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+ids <- datList.un$ids
+time <- datList.un$time
+summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_missing <- as.data.frame(datList.un$missing)
+data_absent <- as.data.frame(datList.un$absent)
+```
+
+# Addendum: X and Ys
+
+```{r}
+data_X <- as.data.frame(datList.un$X)
+data_Y <- as.data.frame(datList.un$Y)
+```
+
+
+```{r}
+names(data_missing) <- ids
+names(data_absent) <- ids
+```
+```{r}
+data_missing$time <- time
+data_absent$time <- time
+```
+
+```{r}
+names(data_X) <- ids
+names(data_Y) <- ids
+```
+```{r}
+data_X$time <- time
+data_Y$time <- time
+```
+
+## Format data
+
+### Missing
+
+```{r}
+# names(data)
+data_missing_long <- melt(data_missing,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="missing"
+        )
+# str(data_c_long)
+```
+```{r}
+id_age <- colsplit(as.character(data_missing_long$id), "_", c("id", "age"))
+data_missing_long <- cbind(id_age, dplyr::select(data_missing_long, -id))
+```
+
+```{r}
+add_info <- colsplit(data_missing_long$age, "m", c("age.t", "group.t"))
+# unique(add_info)
+
+add_info$group <- ifelse(add_info$age.t=="IS2_14", "IS2_COMB",
+                         ifelse(add_info$group.t=="", NA, add_info$group.t))
+# unique(add_info)
+
+add_info$age <- ifelse(add_info$age.t=="IS2_14", "14", add_info$age.t)
+# unique(add_info)
+
+data_missing_long$age <- as.numeric(add_info$age)
+data_missing_long$group <- as.factor(add_info$group)
+```
+
+### Absent
+
+```{r}
+# names(data)
+data_absent_long <- melt(data_absent,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="absent"
+        )
+# str(data_c_long)
+```
+```{r}
+id_age <- colsplit(as.character(data_absent_long$id), "_", c("id", "age"))
+data_absent_long <- cbind(id_age, dplyr::select(data_absent_long, -id))
+```
+
+```{r}
+add_info <- colsplit(data_absent_long$age, "m", c("age.t", "group.t"))
+# unique(add_info)
+
+add_info$group <- ifelse(add_info$age.t=="IS2_14", "IS2_COMB",
+                         ifelse(add_info$group.t=="", NA, add_info$group.t))
+# unique(add_info)
+
+add_info$age <- ifelse(add_info$age.t=="IS2_14", "14", add_info$age.t)
+# unique(add_info)
+
+data_absent_long$age <- as.numeric(add_info$age)
+data_absent_long$group <- as.factor(add_info$group)
+```
+
+### X
+
+```{r}
+# names(data)
+data_X_long <- melt(data_X,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="X"
+        )
+# str(data_c_long)
+```
+```{r}
+id_age <- colsplit(as.character(data_X_long$id), "_", c("id", "age"))
+data_X_long <- cbind(id_age, dplyr::select(data_X_long, -id))
+```
+
+```{r}
+add_info <- colsplit(data_X_long$age, "m", c("age.t", "group.t"))
+# unique(add_info)
+
+add_info$group <- ifelse(add_info$age.t=="IS2_14", "IS2_COMB",
+                         ifelse(add_info$group.t=="", NA, add_info$group.t))
+# unique(add_info)
+
+add_info$age <- ifelse(add_info$age.t=="IS2_14", "14", add_info$age.t)
+# unique(add_info)
+
+data_X_long$age <- as.numeric(add_info$age)
+data_X_long$group <- as.factor(add_info$group)
+```
+
+### Y
+
+```{r}
+# names(data)
+data_Y_long <- melt(data_Y,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="Y"
+        )
+# str(data_c_long)
+```
+```{r}
+id_age <- colsplit(as.character(data_Y_long$id), "_", c("id", "age"))
+data_Y_long <- cbind(id_age, dplyr::select(data_Y_long, -id))
+```
+
+```{r}
+add_info <- colsplit(data_Y_long$age, "m", c("age.t", "group.t"))
+# unique(add_info)
+
+add_info$group <- ifelse(add_info$age.t=="IS2_14", "IS2_COMB",
+                         ifelse(add_info$group.t=="", NA, add_info$group.t))
+# unique(add_info)
+
+add_info$age <- ifelse(add_info$age.t=="IS2_14", "14", add_info$age.t)
+# unique(add_info)
+
+data_Y_long$age <- as.numeric(add_info$age)
+data_Y_long$group <- as.factor(add_info$group)
+```
+
+
+## Merge Missing and Absent, X and Y
+
+#1
+```{r}
+nrow(data_missing_long)-nrow(data_absent_long)
+data_miss_abs_1 <- inner_join(data_missing_long, data_absent_long, by=c("id", "age", "time", "group"))
+
+nrow(data_miss_abs_1)-nrow(data_missing_long)
+```
+
+#2
+```{r}
+data_x_miss_abs <- inner_join(data_miss_abs_1, data_X_long, by=c("id", "age", "time", "group"))
+```
+```{r}
+data_x_y_miss_abs <- inner_join(data_x_miss_abs, data_Y_long, by=c("id", "age", "time", "group"))
+```
+
+## Add trial
+
+```{r}
+data_miss_abs_1$trial <- "STATICIMAGES_ONSETPOPOUT1.TIFPOPOUT"
+data_miss_abs_1$item <- 1
+```
+
+```{r}
+data_x_y_miss_abs$trial <- "STATICIMAGES_ONSETPOPOUT1.TIFPOPOUT"
+data_x_y_miss_abs$item <- 1
+```
+
+```{r}
+save(file = "SavedWS/xy_t1.RData", data_x_y_miss_abs)
+```
+
+
+# Trial 2
+
+```{r}
+datList <- cbfnp_matlabFile$temporal[[10]][[1]][,,1]
+summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+ids <- datList.un$ids
+time <- datList.un$time
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_missing <- as.data.frame(datList.un$missing)
+data_absent <- as.data.frame(datList.un$absent)
+```
+```{r}
+names(data_missing) <- ids
+names(data_absent) <- ids
+```
+```{r}
+data_missing$time <- time
+data_absent$time <- time
+```
+
+## Format data
+
+### Missing
+
+```{r}
+# names(data)
+data_missing_long <- melt(data_missing,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="missing"
+        )
+# str(data_c_long)
+```
+```{r}
+id_age <- colsplit(as.character(data_missing_long$id), "_", c("id", "age"))
+data_missing_long <- cbind(id_age, dplyr::select(data_missing_long, -id))
+```
+
+```{r}
+add_info <- colsplit(data_missing_long$age, "m", c("age.t", "group.t"))
+# unique(add_info)
+
+add_info$group <- ifelse(add_info$age.t=="IS2_14", "IS2_COMB",
+                         ifelse(add_info$group.t=="", NA, add_info$group.t))
+# unique(add_info)
+
+add_info$age <- ifelse(add_info$age.t=="IS2_14", "14", add_info$age.t)
+# unique(add_info)
+
+data_missing_long$age <- as.numeric(add_info$age)
+data_missing_long$group <- as.factor(add_info$group)
+```
+
+### Absent
+
+```{r}
+# names(data)
+data_absent_long <- melt(data_absent,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="absent"
+        )
+# str(data_c_long)
+```
+```{r}
+id_age <- colsplit(as.character(data_absent_long$id), "_", c("id", "age"))
+data_absent_long <- cbind(id_age, dplyr::select(data_absent_long, -id))
+```
+
+```{r}
+add_info <- colsplit(data_absent_long$age, "m", c("age.t", "group.t"))
+# unique(add_info)
+
+add_info$group <- ifelse(add_info$age.t=="IS2_14", "IS2_COMB",
+                         ifelse(add_info$group.t=="", NA, add_info$group.t))
+# unique(add_info)
+
+add_info$age <- ifelse(add_info$age.t=="IS2_14", "14", add_info$age.t)
+# unique(add_info)
+
+data_absent_long$age <- as.numeric(add_info$age)
+data_absent_long$group <- as.factor(add_info$group)
+```
+
+## Merge Missing and Absent
+
+```{r}
+nrow(data_missing_long)-nrow(data_absent_long)
+data_miss_abs_2 <- inner_join(data_missing_long, data_absent_long, by=c("id", "age", "time", "group"))
+
+nrow(data_miss_abs_2)-nrow(data_missing_long)
+```
+
+## Add trial
+
+```{r}
+data_miss_abs_2$trial <- "STATICIMAGES_ONSETPOPOUT2.TIFPOPOUT"
+data_miss_abs_2$item <- 2
+```
+
+
+
+# Trial 3
+
+```{r}
+datList <- cbfnp_matlabFile$temporal[[11]][[1]][,,1]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+ids <- datList.un$ids
+time <- datList.un$time
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_missing <- as.data.frame(datList.un$missing)
+data_absent <- as.data.frame(datList.un$absent)
+```
+```{r}
+names(data_missing) <- ids
+names(data_absent) <- ids
+```
+```{r}
+data_missing$time <- time
+data_absent$time <- time
+```
+
+## Format data
+
+### Missing
+
+```{r}
+# names(data)
+data_missing_long <- melt(data_missing,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="missing"
+        )
+# str(data_c_long)
+```
+```{r}
+id_age <- colsplit(as.character(data_missing_long$id), "_", c("id", "age"))
+data_missing_long <- cbind(id_age, dplyr::select(data_missing_long, -id))
+```
+
+```{r}
+add_info <- colsplit(data_missing_long$age, "m", c("age.t", "group.t"))
+# unique(add_info)
+
+add_info$group <- ifelse(add_info$age.t=="IS2_14", "IS2_COMB",
+                         ifelse(add_info$group.t=="", NA, add_info$group.t))
+# unique(add_info)
+
+add_info$age <- ifelse(add_info$age.t=="IS2_14", "14", add_info$age.t)
+# unique(add_info)
+
+data_missing_long$age <- as.numeric(add_info$age)
+data_missing_long$group <- as.factor(add_info$group)
+```
+
+### Absent
+
+```{r}
+# names(data)
+data_absent_long <- melt(data_absent,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="absent"
+        )
+# str(data_c_long)
+```
+```{r}
+id_age <- colsplit(as.character(data_absent_long$id), "_", c("id", "age"))
+data_absent_long <- cbind(id_age, dplyr::select(data_absent_long, -id))
+```
+
+```{r}
+add_info <- colsplit(data_absent_long$age, "m", c("age.t", "group.t"))
+# unique(add_info)
+
+add_info$group <- ifelse(add_info$age.t=="IS2_14", "IS2_COMB",
+                         ifelse(add_info$group.t=="", NA, add_info$group.t))
+# unique(add_info)
+
+add_info$age <- ifelse(add_info$age.t=="IS2_14", "14", add_info$age.t)
+# unique(add_info)
+
+data_absent_long$age <- as.numeric(add_info$age)
+data_absent_long$group <- as.factor(add_info$group)
+```
+
+## Merge Missing and Absent
+
+```{r}
+nrow(data_missing_long)-nrow(data_absent_long)
+data_miss_abs_3 <- inner_join(data_missing_long, data_absent_long, by=c("id", "age", "time", "group"))
+
+nrow(data_miss_abs_3)-nrow(data_missing_long)
+```
+
+## Add trial
+
+```{r}
+data_miss_abs_3$trial <- "STATICIMAGES_ONSETPOPOUT3.TIFPOPOUT"
+data_miss_abs_3$item <- 3
+```
+
+# Trial 4
+
+```{r}
+datList <- cbfnp_matlabFile$temporal[[12]][[1]][,,1]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+ids <- datList.un$ids
+time <- datList.un$time
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_missing <- as.data.frame(datList.un$missing)
+data_absent <- as.data.frame(datList.un$absent)
+```
+```{r}
+names(data_missing) <- ids
+names(data_absent) <- ids
+```
+```{r}
+data_missing$time <- time
+data_absent$time <- time
+```
+
+## Format data
+
+### Missing
+
+```{r}
+# names(data)
+data_missing_long <- melt(data_missing,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="missing"
+        )
+# str(data_c_long)
+```
+```{r}
+id_age <- colsplit(as.character(data_missing_long$id), "_", c("id", "age"))
+data_missing_long <- cbind(id_age, dplyr::select(data_missing_long, -id))
+```
+
+```{r}
+add_info <- colsplit(data_missing_long$age, "m", c("age.t", "group.t"))
+# unique(add_info)
+
+add_info$group <- ifelse(add_info$age.t=="IS2_14", "IS2_COMB",
+                         ifelse(add_info$group.t=="", NA, add_info$group.t))
+# unique(add_info)
+
+add_info$age <- ifelse(add_info$age.t=="IS2_14", "14", add_info$age.t)
+# unique(add_info)
+
+data_missing_long$age <- as.numeric(add_info$age)
+data_missing_long$group <- as.factor(add_info$group)
+```
+
+### Absent
+
+```{r}
+# names(data)
+data_absent_long <- melt(data_absent,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="absent"
+        )
+# str(data_c_long)
+```
+```{r}
+id_age <- colsplit(as.character(data_absent_long$id), "_", c("id", "age"))
+data_absent_long <- cbind(id_age, dplyr::select(data_absent_long, -id))
+```
+
+```{r}
+add_info <- colsplit(data_absent_long$age, "m", c("age.t", "group.t"))
+# unique(add_info)
+
+add_info$group <- ifelse(add_info$age.t=="IS2_14", "IS2_COMB",
+                         ifelse(add_info$group.t=="", NA, add_info$group.t))
+# unique(add_info)
+
+add_info$age <- ifelse(add_info$age.t=="IS2_14", "14", add_info$age.t)
+# unique(add_info)
+
+data_absent_long$age <- as.numeric(add_info$age)
+data_absent_long$group <- as.factor(add_info$group)
+```
+
+## Merge Missing and Absent
+
+```{r}
+nrow(data_missing_long)-nrow(data_absent_long)
+data_miss_abs_4 <- inner_join(data_missing_long, data_absent_long, by=c("id", "age", "time", "group"))
+
+nrow(data_miss_abs_4)-nrow(data_missing_long)
+```
+
+## Add trial
+
+```{r}
+data_miss_abs_4$trial <- "STATICIMAGES_ONSETPOPOUT4.TIFPOPOUT"
+data_miss_abs_4$item <- 4
+```
+
+
+# Trial 5
+
+```{r}
+datList <- cbfnp_matlabFile$temporal[[13]][[1]][,,1]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+ids <- datList.un$ids
+time <- datList.un$time
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_missing <- as.data.frame(datList.un$missing)
+data_absent <- as.data.frame(datList.un$absent)
+```
+```{r}
+names(data_missing) <- ids
+names(data_absent) <- ids
+```
+```{r}
+data_missing$time <- time
+data_absent$time <- time
+```
+
+## Format data
+
+### Missing
+
+```{r}
+# names(data)
+data_missing_long <- melt(data_missing,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="missing"
+        )
+# str(data_c_long)
+```
+```{r}
+id_age <- colsplit(as.character(data_missing_long$id), "_", c("id", "age"))
+data_missing_long <- cbind(id_age, dplyr::select(data_missing_long, -id))
+```
+
+```{r}
+add_info <- colsplit(data_missing_long$age, "m", c("age.t", "group.t"))
+# unique(add_info)
+
+add_info$group <- ifelse(add_info$age.t=="IS2_14", "IS2_COMB",
+                         ifelse(add_info$group.t=="", NA, add_info$group.t))
+# unique(add_info)
+
+add_info$age <- ifelse(add_info$age.t=="IS2_14", "14", add_info$age.t)
+# unique(add_info)
+
+data_missing_long$age <- as.numeric(add_info$age)
+data_missing_long$group <- as.factor(add_info$group)
+```
+
+### Absent
+
+```{r}
+# names(data)
+data_absent_long <- melt(data_absent,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="absent"
+        )
+# str(data_c_long)
+```
+```{r}
+id_age <- colsplit(as.character(data_absent_long$id), "_", c("id", "age"))
+data_absent_long <- cbind(id_age, dplyr::select(data_absent_long, -id))
+```
+
+```{r}
+add_info <- colsplit(data_absent_long$age, "m", c("age.t", "group.t"))
+# unique(add_info)
+
+add_info$group <- ifelse(add_info$age.t=="IS2_14", "IS2_COMB",
+                         ifelse(add_info$group.t=="", NA, add_info$group.t))
+# unique(add_info)
+
+add_info$age <- ifelse(add_info$age.t=="IS2_14", "14", add_info$age.t)
+# unique(add_info)
+
+data_absent_long$age <- as.numeric(add_info$age)
+data_absent_long$group <- as.factor(add_info$group)
+```
+
+## Merge Missing and Absent
+
+```{r}
+nrow(data_missing_long)-nrow(data_absent_long)
+data_miss_abs_5 <- inner_join(data_missing_long, data_absent_long, by=c("id", "age", "time", "group"))
+
+nrow(data_miss_abs_5)-nrow(data_missing_long)
+```
+
+## Add trial
+
+```{r}
+data_miss_abs_5$trial <- "STATICIMAGES_ONSETPOPOUT5.TIFPOPOUT"
+data_miss_abs_5$item <- 5
+```
+
+# Trial 6
+
+```{r}
+datList <- cbfnp_matlabFile$temporal[[14]][[1]][,,1]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+ids <- datList.un$ids
+time <- datList.un$time
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_missing <- as.data.frame(datList.un$missing)
+data_absent <- as.data.frame(datList.un$absent)
+```
+```{r}
+names(data_missing) <- ids
+names(data_absent) <- ids
+```
+```{r}
+data_missing$time <- time
+data_absent$time <- time
+```
+
+## Format data
+
+### Missing
+
+```{r}
+# names(data)
+data_missing_long <- melt(data_missing,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="missing"
+        )
+# str(data_c_long)
+```
+```{r}
+id_age <- colsplit(as.character(data_missing_long$id), "_", c("id", "age"))
+data_missing_long <- cbind(id_age, dplyr::select(data_missing_long, -id))
+```
+
+```{r}
+add_info <- colsplit(data_missing_long$age, "m", c("age.t", "group.t"))
+# unique(add_info)
+
+add_info$group <- ifelse(add_info$age.t=="IS2_14", "IS2_COMB",
+                         ifelse(add_info$group.t=="", NA, add_info$group.t))
+# unique(add_info)
+
+add_info$age <- ifelse(add_info$age.t=="IS2_14", "14", add_info$age.t)
+# unique(add_info)
+
+data_missing_long$age <- as.numeric(add_info$age)
+data_missing_long$group <- as.factor(add_info$group)
+```
+
+### Absent
+
+```{r}
+# names(data)
+data_absent_long <- melt(data_absent,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="absent"
+        )
+# str(data_c_long)
+```
+```{r}
+id_age <- colsplit(as.character(data_absent_long$id), "_", c("id", "age"))
+data_absent_long <- cbind(id_age, dplyr::select(data_absent_long, -id))
+```
+
+```{r}
+add_info <- colsplit(data_absent_long$age, "m", c("age.t", "group.t"))
+# unique(add_info)
+
+add_info$group <- ifelse(add_info$age.t=="IS2_14", "IS2_COMB",
+                         ifelse(add_info$group.t=="", NA, add_info$group.t))
+# unique(add_info)
+
+add_info$age <- ifelse(add_info$age.t=="IS2_14", "14", add_info$age.t)
+# unique(add_info)
+
+data_absent_long$age <- as.numeric(add_info$age)
+data_absent_long$group <- as.factor(add_info$group)
+```
+
+## Merge Missing and Absent
+
+```{r}
+nrow(data_missing_long)-nrow(data_absent_long)
+data_miss_abs_6 <- inner_join(data_missing_long, data_absent_long, by=c("id", "age", "time", "group"))
+
+nrow(data_miss_abs_6)-nrow(data_missing_long)
+```
+
+## Add trial
+
+```{r}
+data_miss_abs_6$trial <- "STATICIMAGES_ONSETPOPOUT6.TIFPOPOUT"
+data_miss_abs_6$item <- 6
+```
+
+# Trial 7
+
+```{r}
+datList <- cbfnp_matlabFile$temporal[[15]][[1]][,,1]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+ids <- datList.un$ids
+time <- datList.un$time
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_missing <- as.data.frame(datList.un$missing)
+data_absent <- as.data.frame(datList.un$absent)
+```
+```{r}
+names(data_missing) <- ids
+names(data_absent) <- ids
+```
+```{r}
+data_missing$time <- time
+data_absent$time <- time
+```
+
+## Format data
+
+### Missing
+
+```{r}
+# names(data)
+data_missing_long <- melt(data_missing,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="missing"
+        )
+# str(data_c_long)
+```
+```{r}
+id_age <- colsplit(as.character(data_missing_long$id), "_", c("id", "age"))
+data_missing_long <- cbind(id_age, dplyr::select(data_missing_long, -id))
+```
+
+```{r}
+add_info <- colsplit(data_missing_long$age, "m", c("age.t", "group.t"))
+# unique(add_info)
+
+add_info$group <- ifelse(add_info$age.t=="IS2_14", "IS2_COMB",
+                         ifelse(add_info$group.t=="", NA, add_info$group.t))
+# unique(add_info)
+
+add_info$age <- ifelse(add_info$age.t=="IS2_14", "14", add_info$age.t)
+# unique(add_info)
+
+data_missing_long$age <- as.numeric(add_info$age)
+data_missing_long$group <- as.factor(add_info$group)
+```
+
+### Absent
+
+```{r}
+# names(data)
+data_absent_long <- melt(data_absent,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="absent"
+        )
+# str(data_c_long)
+```
+```{r}
+id_age <- colsplit(as.character(data_absent_long$id), "_", c("id", "age"))
+data_absent_long <- cbind(id_age, dplyr::select(data_absent_long, -id))
+```
+
+```{r}
+add_info <- colsplit(data_absent_long$age, "m", c("age.t", "group.t"))
+# unique(add_info)
+
+add_info$group <- ifelse(add_info$age.t=="IS2_14", "IS2_COMB",
+                         ifelse(add_info$group.t=="", NA, add_info$group.t))
+# unique(add_info)
+
+add_info$age <- ifelse(add_info$age.t=="IS2_14", "14", add_info$age.t)
+# unique(add_info)
+
+data_absent_long$age <- as.numeric(add_info$age)
+data_absent_long$group <- as.factor(add_info$group)
+```
+
+## Merge Missing and Absent
+
+```{r}
+nrow(data_missing_long)-nrow(data_absent_long)
+data_miss_abs_7 <- inner_join(data_missing_long, data_absent_long, by=c("id", "age", "time", "group"))
+
+nrow(data_miss_abs_7)-nrow(data_missing_long)
+```
+
+## Add trial
+
+```{r}
+data_miss_abs_7$trial <- "STATICIMAGES_ONSETPOPOUT7.TIFPOPOUT"
+data_miss_abs_7$item <- 7
+```
+
+# Trial 8
+
+```{r}
+datList <- cbfnp_matlabFile$temporal[[16]][[1]][,,1]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+ids <- datList.un$ids
+time <- datList.un$time
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_missing <- as.data.frame(datList.un$missing)
+data_absent <- as.data.frame(datList.un$absent)
+```
+```{r}
+names(data_missing) <- ids
+names(data_absent) <- ids
+```
+```{r}
+data_missing$time <- time
+data_absent$time <- time
+```
+
+## Format data
+
+### Missing
+
+```{r}
+# names(data)
+data_missing_long <- melt(data_missing,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="missing"
+        )
+# str(data_c_long)
+```
+```{r}
+id_age <- colsplit(as.character(data_missing_long$id), "_", c("id", "age"))
+data_missing_long <- cbind(id_age, dplyr::select(data_missing_long, -id))
+```
+
+```{r}
+add_info <- colsplit(data_missing_long$age, "m", c("age.t", "group.t"))
+# unique(add_info)
+
+add_info$group <- ifelse(add_info$age.t=="IS2_14", "IS2_COMB",
+                         ifelse(add_info$group.t=="", NA, add_info$group.t))
+# unique(add_info)
+
+add_info$age <- ifelse(add_info$age.t=="IS2_14", "14", add_info$age.t)
+# unique(add_info)
+
+data_missing_long$age <- as.numeric(add_info$age)
+data_missing_long$group <- as.factor(add_info$group)
+```
+
+### Absent
+
+```{r}
+# names(data)
+data_absent_long <- melt(data_absent,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="absent"
+        )
+# str(data_c_long)
+```
+```{r}
+id_age <- colsplit(as.character(data_absent_long$id), "_", c("id", "age"))
+data_absent_long <- cbind(id_age, dplyr::select(data_absent_long, -id))
+```
+
+```{r}
+add_info <- colsplit(data_absent_long$age, "m", c("age.t", "group.t"))
+# unique(add_info)
+
+add_info$group <- ifelse(add_info$age.t=="IS2_14", "IS2_COMB",
+                         ifelse(add_info$group.t=="", NA, add_info$group.t))
+# unique(add_info)
+
+add_info$age <- ifelse(add_info$age.t=="IS2_14", "14", add_info$age.t)
+# unique(add_info)
+
+data_absent_long$age <- as.numeric(add_info$age)
+data_absent_long$group <- as.factor(add_info$group)
+```
+
+## Merge Missing and Absent
+
+```{r}
+nrow(data_missing_long)-nrow(data_absent_long)
+data_miss_abs_8 <- inner_join(data_missing_long, data_absent_long, by=c("id", "age", "time", "group"))
+
+nrow(data_miss_abs_8)-nrow(data_missing_long)
+```
+
+## Add trial
+
+```{r}
+data_miss_abs_8$trial <- "STATICIMAGES_ONSETPOPOUT8.TIFPOPOUT"
+data_miss_abs_8$item <- 8
+```
+
+# Merge all trials together
+
+```{r}
+data_miss_abs <- rbind(data_miss_abs_1,
+                       data_miss_abs_2,
+                       data_miss_abs_3,
+                       data_miss_abs_4,
+                       data_miss_abs_5,
+                       data_miss_abs_6,
+                       data_miss_abs_7,
+                       data_miss_abs_8)
+```
+
+# Select Phase 3 data
+
+```{r}
+rg <- read.csv("Datasets/rg.csv")
+str(rg)
+rg <- rg %>%
+  mutate(id=paste0("A", ID)) %>%
+  dplyr::select(-ID)
+```
+
+```{r}
+data_miss_abs.ph3 <- data_miss_abs %>%
+  inner_join(rg, by="id")
+```
+
+```{r}
+length(unique(data_miss_abs.ph3$id))
+```
+
+# Exclude ADHD Risk Only
+
+```{r}
+data_miss_abs.ph3.asd <- data_miss_abs.ph3 %>%
+  filter(!(ASD==0 & ADHD==1))
+```
+
+# Look at the missing data
+
+```{r}
+data_miss_abs.ph3.asd %>%
+  filter(absent==1 & missing==1) #ok
+```
+
+```{r}
+not_pres <- data_miss_abs.ph3.asd %>%
+  filter(absent==1) %>%
+  distinct(id, group, age, time, trial, item)
+head(not_pres)
+```
+
+```{r}
+p_NA <- data_miss_abs.ph3.asd %>%
+  group_by(id, group, age, item) %>%
+  summarise(pNA=sum(missing==1)/n()*100)
+head(p_NA)
+```
+
+```{r}
+tot_t <- p_NA %>%
+  group_by(id, age) %>%
+  summarise(N_t=length(item))
+
+to_excl <- p_NA %>%
+  filter(pNA>75) %>%
+  distinct(id, group, age, item) 
+head(to_excl)
+```
+
+## Some participants completely excluded?
+
+```{r}
+to_excl %>%
+  group_by(id, group, age) %>%
+  summarise(N_excl=n()) %>%
+  inner_join(tot_t, by=c("id", "age")) %>%
+  mutate(P_excl=N_excl/N_t*100) %>%
+  filter(P_excl==100) %>%
+  arrange(age) %>%
+  group_by(age) %>%
+  summarise(N=n())
+```
+
+# Sample size after cleaning
+
+```{r}
+p_NA %>%
+  filter(pNA<=75) %>%
+  distinct(id, group, age) %>%
+  group_by(age) %>%
+  summarise(N=length(id))
+```
+
+```{r}
+pNA.trials.plot <- ggplot(data=p_NA) +
+  geom_histogram(aes(x=reorder(id, age), y=pNA,
+                   fill=factor(age)), 
+               stat = "identity",
+               position = "identity") +
+  theme_bw() +
+  theme(axis.text.x = element_blank()) +
+  labs(y="% of Missing Data",
+       x="Participant",
+       fill="Age (months)") +
+  geom_hline(yintercept = 25, col="red", linetype="dashed") +
+  facet_wrap(~item, nrow = 8)
+pNA.trials.plot
+# ggsave(pNA.trials.plot, file="Plots/pNA.trials.pdf", height = 15)
+```
+
+```{r}
+save(p_NA, to_excl, not_pres, pNA.trials.plot, file="SavedWS/NA_info.RData")
+```

@@ -1,0 +1,2939 @@
+---
+title: "Data Import"
+author: "Teresa Del Bianco"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+# Load packages 
+
+```{r, message = FALSE, warning = FALSE, include = FALSE}
+packs <- c("R.matlab", "reshape2", "dplyr", "multidplyr", "ggplot2", "tidyr")
+lapply(packs, require, character.only = TRUE)
+```
+
+# Read data from matlab (? Hz)
+
+```{r}
+cbfnp_matlabFile  <- readMat('MatFiles/ph2_popout_20200203T210725.mat')
+head(cbfnp_matlabFile$res)
+```
+
+AOIS: face, car, phone, noise, bird
+
+There are 10 trials of x sec duration. Each trial is identified by the item id (e.g, "NonSocial_Slide1.jpg")
+
+# Trial 1
+
+## AOI = car
+
+```{r}
+datList <- cbfnp_matlabFile$temporal[[1]][[1]][,,5]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+ids <- lapply(cbfnp_matlabFile$temporal[[11]][[1]][,,1], unlist, use.names=FALSE)$ids
+time <- lapply(cbfnp_matlabFile$temporal[[11]][[1]][,,1], unlist, use.names=FALSE)$time
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_c <- as.data.frame(datList.un[[2]])
+```
+```{r}
+names(data_c) <- ids
+```
+```{r}
+data_c$time <- time
+```
+```{r}
+data_c$aoi.name <- datList.un[[1]][,1]
+```
+```{r}
+# head(data_c[,c(1,ncol(data_c)-1,ncol(data_c))])
+```
+
+### Format data
+
+```{r}
+# names(data)
+data_c_long <- melt(data_c,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time", "aoi.name"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="plt.car"
+        )
+# str(data_c_long)
+```
+```{r}
+data_c_long <- select(data_c_long, -aoi.name)
+id_visit <- colsplit(as.character(data_c_long$id), "_", c("id", "visit"))
+data_c_long <- cbind(id_visit, select(data_c_long, -id))
+data_c_long <- arrange(data_c_long, id, visit)
+# head(data_c_long)
+```
+
+## AOI = Bird
+
+```{r}
+datList <- cbfnp_matlabFile$temporal[[1]][[1]][,,4]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+# ids <- lapply(cbfnp_matlabFile$temporal[[11]][[1]][,,1], unlist, use.names=FALSE)$ids
+# time <- lapply(cbfnp_matlabFile$temporal[[11]][[1]][,,1], unlist, use.names=FALSE)$time
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_b <- as.data.frame(datList.un[[2]])
+```
+```{r}
+names(data_b) <- ids
+```
+```{r}
+data_b$time <- time
+```
+```{r}
+data_b$aoi.name <- datList.un[[1]][,1]
+```
+```{r}
+# head(data_b[,c(1,ncol(data_b)-1,ncol(data_b))])
+```
+
+### Format data
+
+```{r}
+# names(data)
+data_b_long <- melt(data_b,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time", "aoi.name"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="plt.bird"
+        )
+# str(data_b_long)
+```
+```{r}
+data_b_long <- select(data_b_long, -aoi.name)
+id_visit <- colsplit(as.character(data_b_long$id), "_", c("id", "visit"))
+data_b_long <- cbind(id_visit, select(data_b_long, -id))
+data_b_long <- arrange(data_b_long, id, visit)
+# head(data_c_long)
+```
+
+## AOI = Face
+
+```{r}
+datList <- cbfnp_matlabFile$temporalScores[[1]][[1]][,,1]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_f <- as.data.frame(datList.un[[2]])
+```
+```{r}
+names(data_f) <- ids
+```
+```{r}
+data_f$time <- time
+```
+```{r}
+data_f$aoi.name <- datList.un[[1]][,1]
+```
+```{r}
+# head(data_f[,c(1,ncol(data_f)-1,ncol(data_f))])
+```
+
+### Format data
+
+```{r}
+# names(data)
+data_f_long <- melt(data_f,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time", "aoi.name"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="plt.face"
+        )
+# str(data_f_long)
+```
+```{r}
+data_f_long <- select(data_f_long, -aoi.name)
+id_visit <- colsplit(as.character(data_f_long$id), "_", c("id", "visit"))
+data_f_long <- cbind(id_visit, select(data_f_long, -id))
+data_f_long <- arrange(data_f_long, id, visit)
+# head(data_f_long)
+```
+
+## AOI = Noise
+
+```{r}
+datList <- cbfnp_matlabFile$temporalScores[[1]][[1]][,,2]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_n <- as.data.frame(datList.un[[2]])
+```
+```{r}
+names(data_n) <- ids
+```
+```{r}
+data_n$time <- time
+```
+```{r}
+data_n$aoi.name <- datList.un[[1]][,1]
+```
+```{r}
+# head(data_n[,c(1,ncol(data_n)-1,ncol(data_n))])
+```
+
+### Format data
+
+```{r}
+# names(data)
+data_n_long <- melt(data_n,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time", "aoi.name"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="plt.noise"
+        )
+# str(data_n_long)
+```
+```{r}
+data_n_long <- select(data_n_long, -aoi.name)
+id_visit <- colsplit(as.character(data_n_long$id), "_", c("id", "visit"))
+data_n_long <- cbind(id_visit, select(data_n_long, -id))
+data_n_long <- arrange(data_n_long, id, visit)
+# head(data_n_long)
+```
+
+## AOI = Phone
+
+```{r}
+datList <- cbfnp_matlabFile$temporalScores[[1]][[1]][,,3]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_p <- as.data.frame(datList.un[[2]])
+```
+```{r}
+names(data_p) <- ids
+```
+```{r}
+data_p$time <- time
+```
+```{r}
+data_p$aoi.name <- datList.un[[1]][,1]
+```
+```{r}
+# head(data_p[,c(1,ncol(data_p)-1,ncol(data_p))])
+```
+
+### Format data
+
+```{r}
+# names(data)
+data_p_long <- melt(data_p,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time", "aoi.name"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="plt.phone"
+        )
+# str(data_p_long)
+```
+```{r}
+data_p_long <- select(data_p_long, -aoi.name)
+id_visit <- colsplit(as.character(data_p_long$id), "_", c("id", "visit"))
+data_p_long <- cbind(id_visit, select(data_p_long, -id))
+data_p_long <- arrange(data_p_long, id, visit)
+# head(data_p_long)
+```
+
+## Merge datasets
+
+```{r}
+cb <- left_join(data_c_long, data_b_long, by=c("id", "time", "visit"))
+cbf <- left_join(cb, data_f_long, by=c("id", "time", "visit"))
+cbfn <- left_join(cbf, data_n_long, by=c("id", "time", "visit"))
+cbfnp <- left_join(cbfn, data_p_long, by=c("id", "time", "visit"))
+cbfnp.1 <- cbfnp %>%
+  mutate(stim=cbfnp_matlabFile$temporalScores[[21]][[1]][,1]) %>%
+  separate(col=stim, sep="_", into=c("cond", "trial")) %>%
+  mutate(trial=gsub(pattern = ".jpg", 
+                    replacement = "",
+                    x=trial),
+         trial=gsub(pattern = "Slide", 
+                    replacement = "",
+                    x=trial))
+# head(cbfnp.1)
+```
+
+```{r}
+rm(list=setdiff(ls(), ls(pattern = c("cbfnp"))))
+```
+
+
+
+
+
+# Trial 2
+
+## AOI = car
+
+```{r}
+datList <- cbfnp_matlabFile$temporal[[2]][[1]][,,5]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+ids <- lapply(cbfnp_matlabFile$temporal[[12]][[1]][,,1], unlist, use.names=FALSE)$ids
+time <- lapply(cbfnp_matlabFile$temporal[[12]][[1]][,,1], unlist, use.names=FALSE)$time
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_c <- as.data.frame(datList.un[[2]])
+```
+```{r}
+names(data_c) <- ids
+```
+```{r}
+data_c$time <- time
+```
+```{r}
+data_c$aoi.name <- datList.un[[1]][,1]
+```
+```{r}
+# head(data_c[,c(1,ncol(data_c)-1,ncol(data_c))])
+```
+
+### Format data
+
+```{r}
+# names(data)
+data_c_long <- melt(data_c,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time", "aoi.name"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="plt.car"
+        )
+# str(data_c_long)
+```
+```{r}
+data_c_long <- select(data_c_long, -aoi.name)
+id_visit <- colsplit(as.character(data_c_long$id), "_", c("id", "visit"))
+data_c_long <- cbind(id_visit, select(data_c_long, -id))
+data_c_long <- arrange(data_c_long, id, visit)
+# head(data_c_long)
+```
+
+## AOI = Bird
+
+```{r}
+datList <- cbfnp_matlabFile$temporal[[2]][[1]][,,4]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+# ids <- lapply(cbfnp_matlabFile$temporal[[11]][[1]][,,1], unlist, use.names=FALSE)$ids
+# time <- lapply(cbfnp_matlabFile$temporal[[11]][[1]][,,1], unlist, use.names=FALSE)$time
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_b <- as.data.frame(datList.un[[2]])
+```
+```{r}
+names(data_b) <- ids
+```
+```{r}
+data_b$time <- time
+```
+```{r}
+data_b$aoi.name <- datList.un[[1]][,1]
+```
+```{r}
+# head(data_b[,c(1,ncol(data_b)-1,ncol(data_b))])
+```
+
+### Format data
+
+```{r}
+# names(data)
+data_b_long <- melt(data_b,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time", "aoi.name"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="plt.bird"
+        )
+# str(data_b_long)
+```
+```{r}
+data_b_long <- select(data_b_long, -aoi.name)
+id_visit <- colsplit(as.character(data_b_long$id), "_", c("id", "visit"))
+data_b_long <- cbind(id_visit, select(data_b_long, -id))
+data_b_long <- arrange(data_b_long, id, visit)
+# head(data_c_long)
+```
+
+## AOI = Face
+
+```{r}
+datList <- cbfnp_matlabFile$temporalScores[[2]][[1]][,,1]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_f <- as.data.frame(datList.un[[2]])
+```
+```{r}
+names(data_f) <- ids
+```
+```{r}
+data_f$time <- time
+```
+```{r}
+data_f$aoi.name <- datList.un[[1]][,1]
+```
+```{r}
+# head(data_f[,c(1,ncol(data_f)-1,ncol(data_f))])
+```
+
+### Format data
+
+```{r}
+# names(data)
+data_f_long <- melt(data_f,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time", "aoi.name"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="plt.face"
+        )
+# str(data_f_long)
+```
+```{r}
+data_f_long <- select(data_f_long, -aoi.name)
+id_visit <- colsplit(as.character(data_f_long$id), "_", c("id", "visit"))
+data_f_long <- cbind(id_visit, select(data_f_long, -id))
+data_f_long <- arrange(data_f_long, id, visit)
+# head(data_f_long)
+```
+
+## AOI = Noise
+
+```{r}
+datList <- cbfnp_matlabFile$temporalScores[[2]][[1]][,,2]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_n <- as.data.frame(datList.un[[2]])
+```
+```{r}
+names(data_n) <- ids
+```
+```{r}
+data_n$time <- time
+```
+```{r}
+data_n$aoi.name <- datList.un[[1]][,1]
+```
+```{r}
+# head(data_n[,c(1,ncol(data_n)-1,ncol(data_n))])
+```
+
+### Format data
+
+```{r}
+# names(data)
+data_n_long <- melt(data_n,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time", "aoi.name"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="plt.noise"
+        )
+# str(data_n_long)
+```
+```{r}
+data_n_long <- select(data_n_long, -aoi.name)
+id_visit <- colsplit(as.character(data_n_long$id), "_", c("id", "visit"))
+data_n_long <- cbind(id_visit, select(data_n_long, -id))
+data_n_long <- arrange(data_n_long, id, visit)
+# head(data_n_long)
+```
+
+## AOI = Phone
+
+```{r}
+datList <- cbfnp_matlabFile$temporalScores[[2]][[1]][,,3]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_p <- as.data.frame(datList.un[[2]])
+```
+```{r}
+names(data_p) <- ids
+```
+```{r}
+data_p$time <- time
+```
+```{r}
+data_p$aoi.name <- datList.un[[1]][,1]
+```
+```{r}
+# head(data_p[,c(1,ncol(data_p)-1,ncol(data_p))])
+```
+
+### Format data
+
+```{r}
+# names(data)
+data_p_long <- melt(data_p,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time", "aoi.name"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="plt.phone"
+        )
+# str(data_p_long)
+```
+```{r}
+data_p_long <- select(data_p_long, -aoi.name)
+id_visit <- colsplit(as.character(data_p_long$id), "_", c("id", "visit"))
+data_p_long <- cbind(id_visit, select(data_p_long, -id))
+data_p_long <- arrange(data_p_long, id, visit)
+# head(data_p_long)
+```
+
+## Merge datasets
+
+```{r}
+cb <- left_join(data_c_long, data_b_long, by=c("id", "time", "visit"))
+cbf <- left_join(cb, data_f_long, by=c("id", "time", "visit"))
+cbfn <- left_join(cbf, data_n_long, by=c("id", "time", "visit"))
+cbfnp <- left_join(cbfn, data_p_long, by=c("id", "time", "visit"))
+cbfnp.2 <- cbfnp %>%
+  mutate(stim=cbfnp_matlabFile$temporalScores[[22]][[1]][,1]) %>%
+  separate(col=stim, sep="_", into=c("cond", "trial")) %>%
+  mutate(trial=gsub(pattern = ".jpg", 
+                    replacement = "",
+                    x=trial),
+         trial=gsub(pattern = "Slide", 
+                    replacement = "",
+                    x=trial))
+# head(cbfnp.2)
+```
+
+```{r}
+rm(list=setdiff(ls(), ls(pattern = c("cbfnp"))))
+```
+
+# Trial 3
+
+## AOI = car
+
+```{r}
+datList <- cbfnp_matlabFile$temporal[[3]][[1]][,,5]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+ids <- lapply(cbfnp_matlabFile$temporal[[13]][[1]][,,1], unlist, use.names=FALSE)$ids
+time <- lapply(cbfnp_matlabFile$temporal[[13]][[1]][,,1], unlist, use.names=FALSE)$time
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_c <- as.data.frame(datList.un[[2]])
+```
+```{r}
+names(data_c) <- ids
+```
+```{r}
+data_c$time <- time
+```
+```{r}
+data_c$aoi.name <- datList.un[[1]][,1]
+```
+```{r}
+# head(data_c[,c(1,ncol(data_c)-1,ncol(data_c))])
+```
+
+### Format data
+
+```{r}
+# names(data)
+data_c_long <- melt(data_c,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time", "aoi.name"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="plt.car"
+        )
+# str(data_c_long)
+```
+```{r}
+data_c_long <- select(data_c_long, -aoi.name)
+id_visit <- colsplit(as.character(data_c_long$id), "_", c("id", "visit"))
+data_c_long <- cbind(id_visit, select(data_c_long, -id))
+data_c_long <- arrange(data_c_long, id, visit)
+# head(data_c_long)
+```
+
+## AOI = Bird
+
+```{r}
+datList <- cbfnp_matlabFile$temporal[[3]][[1]][,,4]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+# ids <- lapply(cbfnp_matlabFile$temporal[[11]][[1]][,,1], unlist, use.names=FALSE)$ids
+# time <- lapply(cbfnp_matlabFile$temporal[[11]][[1]][,,1], unlist, use.names=FALSE)$time
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_b <- as.data.frame(datList.un[[2]])
+```
+```{r}
+names(data_b) <- ids
+```
+```{r}
+data_b$time <- time
+```
+```{r}
+data_b$aoi.name <- datList.un[[1]][,1]
+```
+```{r}
+# head(data_b[,c(1,ncol(data_b)-1,ncol(data_b))])
+```
+
+### Format data
+
+```{r}
+# names(data)
+data_b_long <- melt(data_b,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time", "aoi.name"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="plt.bird"
+        )
+# str(data_b_long)
+```
+```{r}
+data_b_long <- select(data_b_long, -aoi.name)
+id_visit <- colsplit(as.character(data_b_long$id), "_", c("id", "visit"))
+data_b_long <- cbind(id_visit, select(data_b_long, -id))
+data_b_long <- arrange(data_b_long, id, visit)
+# head(data_c_long)
+```
+
+## AOI = Face
+
+```{r}
+datList <- cbfnp_matlabFile$temporalScores[[3]][[1]][,,1]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_f <- as.data.frame(datList.un[[2]])
+```
+```{r}
+names(data_f) <- ids
+```
+```{r}
+data_f$time <- time
+```
+```{r}
+data_f$aoi.name <- datList.un[[1]][,1]
+```
+```{r}
+# head(data_f[,c(1,ncol(data_f)-1,ncol(data_f))])
+```
+
+### Format data
+
+```{r}
+# names(data)
+data_f_long <- melt(data_f,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time", "aoi.name"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="plt.face"
+        )
+# str(data_f_long)
+```
+```{r}
+data_f_long <- select(data_f_long, -aoi.name)
+id_visit <- colsplit(as.character(data_f_long$id), "_", c("id", "visit"))
+data_f_long <- cbind(id_visit, select(data_f_long, -id))
+data_f_long <- arrange(data_f_long, id, visit)
+# head(data_f_long)
+```
+
+## AOI = Noise
+
+```{r}
+datList <- cbfnp_matlabFile$temporalScores[[3]][[1]][,,2]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_n <- as.data.frame(datList.un[[2]])
+```
+```{r}
+names(data_n) <- ids
+```
+```{r}
+data_n$time <- time
+```
+```{r}
+data_n$aoi.name <- datList.un[[1]][,1]
+```
+```{r}
+# head(data_n[,c(1,ncol(data_n)-1,ncol(data_n))])
+```
+
+### Format data
+
+```{r}
+# names(data)
+data_n_long <- melt(data_n,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time", "aoi.name"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="plt.noise"
+        )
+# str(data_n_long)
+```
+```{r}
+data_n_long <- select(data_n_long, -aoi.name)
+id_visit <- colsplit(as.character(data_n_long$id), "_", c("id", "visit"))
+data_n_long <- cbind(id_visit, select(data_n_long, -id))
+data_n_long <- arrange(data_n_long, id, visit)
+# head(data_n_long)
+```
+
+## AOI = Phone
+
+```{r}
+datList <- cbfnp_matlabFile$temporalScores[[3]][[1]][,,3]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_p <- as.data.frame(datList.un[[2]])
+```
+```{r}
+names(data_p) <- ids
+```
+```{r}
+data_p$time <- time
+```
+```{r}
+data_p$aoi.name <- datList.un[[1]][,1]
+```
+```{r}
+# head(data_p[,c(1,ncol(data_p)-1,ncol(data_p))])
+```
+
+### Format data
+
+```{r}
+# names(data)
+data_p_long <- melt(data_p,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time", "aoi.name"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="plt.phone"
+        )
+# str(data_p_long)
+```
+```{r}
+data_p_long <- select(data_p_long, -aoi.name)
+id_visit <- colsplit(as.character(data_p_long$id), "_", c("id", "visit"))
+data_p_long <- cbind(id_visit, select(data_p_long, -id))
+data_p_long <- arrange(data_p_long, id, visit)
+# head(data_p_long)
+```
+
+## Merge datasets
+
+```{r}
+cb <- left_join(data_c_long, data_b_long, by=c("id", "time", "visit"))
+cbf <- left_join(cb, data_f_long, by=c("id", "time", "visit"))
+cbfn <- left_join(cbf, data_n_long, by=c("id", "time", "visit"))
+cbfnp <- left_join(cbfn, data_p_long, by=c("id", "time", "visit"))
+cbfnp.3 <- cbfnp %>%
+  mutate(stim=cbfnp_matlabFile$temporalScores[[23]][[1]][,1]) %>%
+  separate(col=stim, sep="_", into=c("cond", "trial")) %>%
+  mutate(trial=gsub(pattern = ".jpg", 
+                    replacement = "",
+                    x=trial),
+         trial=gsub(pattern = "Slide", 
+                    replacement = "",
+                    x=trial))
+# head(cbfnp.3)
+```
+
+```{r}
+rm(list=setdiff(ls(), ls(pattern = c("cbfnp"))))
+```
+
+
+
+
+
+
+
+
+# Trial 4
+
+## AOI = car
+
+```{r}
+datList <- cbfnp_matlabFile$temporal[[4]][[1]][,,5]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+ids <- lapply(cbfnp_matlabFile$temporal[[14]][[1]][,,1], unlist, use.names=FALSE)$ids
+time <- lapply(cbfnp_matlabFile$temporal[[14]][[1]][,,1], unlist, use.names=FALSE)$time
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_c <- as.data.frame(datList.un[[2]])
+```
+```{r}
+names(data_c) <- ids
+```
+```{r}
+data_c$time <- time
+```
+```{r}
+data_c$aoi.name <- datList.un[[1]][,1]
+```
+```{r}
+# head(data_c[,c(1,ncol(data_c)-1,ncol(data_c))])
+```
+
+### Format data
+
+```{r}
+# names(data)
+data_c_long <- melt(data_c,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time", "aoi.name"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="plt.car"
+        )
+# str(data_c_long)
+```
+```{r}
+data_c_long <- select(data_c_long, -aoi.name)
+id_visit <- colsplit(as.character(data_c_long$id), "_", c("id", "visit"))
+data_c_long <- cbind(id_visit, select(data_c_long, -id))
+data_c_long <- arrange(data_c_long, id, visit)
+# head(data_c_long)
+```
+
+## AOI = Bird
+
+```{r}
+datList <- cbfnp_matlabFile$temporal[[4]][[1]][,,4]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+# ids <- lapply(cbfnp_matlabFile$temporal[[11]][[1]][,,1], unlist, use.names=FALSE)$ids
+# time <- lapply(cbfnp_matlabFile$temporal[[11]][[1]][,,1], unlist, use.names=FALSE)$time
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_b <- as.data.frame(datList.un[[2]])
+```
+```{r}
+names(data_b) <- ids
+```
+```{r}
+data_b$time <- time
+```
+```{r}
+data_b$aoi.name <- datList.un[[1]][,1]
+```
+```{r}
+# head(data_b[,c(1,ncol(data_b)-1,ncol(data_b))])
+```
+
+### Format data
+
+```{r}
+# names(data)
+data_b_long <- melt(data_b,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time", "aoi.name"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="plt.bird"
+        )
+# str(data_b_long)
+```
+```{r}
+data_b_long <- select(data_b_long, -aoi.name)
+id_visit <- colsplit(as.character(data_b_long$id), "_", c("id", "visit"))
+data_b_long <- cbind(id_visit, select(data_b_long, -id))
+data_b_long <- arrange(data_b_long, id, visit)
+# head(data_c_long)
+```
+
+## AOI = Face
+
+```{r}
+datList <- cbfnp_matlabFile$temporalScores[[4]][[1]][,,1]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_f <- as.data.frame(datList.un[[2]])
+```
+```{r}
+names(data_f) <- ids
+```
+```{r}
+data_f$time <- time
+```
+```{r}
+data_f$aoi.name <- datList.un[[1]][,1]
+```
+```{r}
+# head(data_f[,c(1,ncol(data_f)-1,ncol(data_f))])
+```
+
+### Format data
+
+```{r}
+# names(data)
+data_f_long <- melt(data_f,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time", "aoi.name"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="plt.face"
+        )
+# str(data_f_long)
+```
+```{r}
+data_f_long <- select(data_f_long, -aoi.name)
+id_visit <- colsplit(as.character(data_f_long$id), "_", c("id", "visit"))
+data_f_long <- cbind(id_visit, select(data_f_long, -id))
+data_f_long <- arrange(data_f_long, id, visit)
+# head(data_f_long)
+```
+
+## AOI = Noise
+
+```{r}
+datList <- cbfnp_matlabFile$temporalScores[[4]][[1]][,,2]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_n <- as.data.frame(datList.un[[2]])
+```
+```{r}
+names(data_n) <- ids
+```
+```{r}
+data_n$time <- time
+```
+```{r}
+data_n$aoi.name <- datList.un[[1]][,1]
+```
+```{r}
+# head(data_n[,c(1,ncol(data_n)-1,ncol(data_n))])
+```
+
+### Format data
+
+```{r}
+# names(data)
+data_n_long <- melt(data_n,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time", "aoi.name"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="plt.noise"
+        )
+# str(data_n_long)
+```
+```{r}
+data_n_long <- select(data_n_long, -aoi.name)
+id_visit <- colsplit(as.character(data_n_long$id), "_", c("id", "visit"))
+data_n_long <- cbind(id_visit, select(data_n_long, -id))
+data_n_long <- arrange(data_n_long, id, visit)
+# head(data_n_long)
+```
+
+## AOI = Phone
+
+```{r}
+datList <- cbfnp_matlabFile$temporalScores[[4]][[1]][,,3]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_p <- as.data.frame(datList.un[[2]])
+```
+```{r}
+names(data_p) <- ids
+```
+```{r}
+data_p$time <- time
+```
+```{r}
+data_p$aoi.name <- datList.un[[1]][,1]
+```
+```{r}
+# head(data_p[,c(1,ncol(data_p)-1,ncol(data_p))])
+```
+
+### Format data
+
+```{r}
+# names(data)
+data_p_long <- melt(data_p,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time", "aoi.name"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="plt.phone"
+        )
+# str(data_p_long)
+```
+```{r}
+data_p_long <- select(data_p_long, -aoi.name)
+id_visit <- colsplit(as.character(data_p_long$id), "_", c("id", "visit"))
+data_p_long <- cbind(id_visit, select(data_p_long, -id))
+data_p_long <- arrange(data_p_long, id, visit)
+# head(data_p_long)
+```
+
+## Merge datasets
+
+```{r}
+cb <- left_join(data_c_long, data_b_long, by=c("id", "time", "visit"))
+cbf <- left_join(cb, data_f_long, by=c("id", "time", "visit"))
+cbfn <- left_join(cbf, data_n_long, by=c("id", "time", "visit"))
+cbfnp <- left_join(cbfn, data_p_long, by=c("id", "time", "visit"))
+cbfnp.4 <- cbfnp %>%
+  mutate(stim=cbfnp_matlabFile$temporalScores[[24]][[1]][,1]) %>%
+  separate(col=stim, sep="_", into=c("cond", "trial")) %>%
+  mutate(trial=gsub(pattern = ".jpg", 
+                    replacement = "",
+                    x=trial),
+         trial=gsub(pattern = "Slide", 
+                    replacement = "",
+                    x=trial))
+# head(cbfnp.3)
+```
+
+```{r}
+rm(list=setdiff(ls(), ls(pattern = c("cbfnp"))))
+```
+
+
+
+
+
+
+
+
+
+
+# Trial 5
+
+## AOI = car
+
+```{r}
+datList <- cbfnp_matlabFile$temporal[[5]][[1]][,,5]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+ids <- lapply(cbfnp_matlabFile$temporal[[15]][[1]][,,1], unlist, use.names=FALSE)$ids
+time <- lapply(cbfnp_matlabFile$temporal[[15]][[1]][,,1], unlist, use.names=FALSE)$time
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_c <- as.data.frame(datList.un[[2]])
+```
+```{r}
+names(data_c) <- ids
+```
+```{r}
+data_c$time <- time
+```
+```{r}
+data_c$aoi.name <- datList.un[[1]][,1]
+```
+```{r}
+# head(data_c[,c(1,ncol(data_c)-1,ncol(data_c))])
+```
+
+### Format data
+
+```{r}
+# names(data)
+data_c_long <- melt(data_c,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time", "aoi.name"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="plt.car"
+        )
+# str(data_c_long)
+```
+```{r}
+data_c_long <- select(data_c_long, -aoi.name)
+id_visit <- colsplit(as.character(data_c_long$id), "_", c("id", "visit"))
+data_c_long <- cbind(id_visit, select(data_c_long, -id))
+data_c_long <- arrange(data_c_long, id, visit)
+# head(data_c_long)
+```
+
+## AOI = Bird
+
+```{r}
+datList <- cbfnp_matlabFile$temporal[[5]][[1]][,,4]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+# ids <- lapply(cbfnp_matlabFile$temporal[[11]][[1]][,,1], unlist, use.names=FALSE)$ids
+# time <- lapply(cbfnp_matlabFile$temporal[[11]][[1]][,,1], unlist, use.names=FALSE)$time
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_b <- as.data.frame(datList.un[[2]])
+```
+```{r}
+names(data_b) <- ids
+```
+```{r}
+data_b$time <- time
+```
+```{r}
+data_b$aoi.name <- datList.un[[1]][,1]
+```
+```{r}
+# head(data_b[,c(1,ncol(data_b)-1,ncol(data_b))])
+```
+
+### Format data
+
+```{r}
+# names(data)
+data_b_long <- melt(data_b,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time", "aoi.name"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="plt.bird"
+        )
+# str(data_b_long)
+```
+```{r}
+data_b_long <- select(data_b_long, -aoi.name)
+id_visit <- colsplit(as.character(data_b_long$id), "_", c("id", "visit"))
+data_b_long <- cbind(id_visit, select(data_b_long, -id))
+data_b_long <- arrange(data_b_long, id, visit)
+# head(data_c_long)
+```
+
+## AOI = Face
+
+```{r}
+datList <- cbfnp_matlabFile$temporalScores[[5]][[1]][,,1]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_f <- as.data.frame(datList.un[[2]])
+```
+```{r}
+names(data_f) <- ids
+```
+```{r}
+data_f$time <- time
+```
+```{r}
+data_f$aoi.name <- datList.un[[1]][,1]
+```
+```{r}
+# head(data_f[,c(1,ncol(data_f)-1,ncol(data_f))])
+```
+
+### Format data
+
+```{r}
+# names(data)
+data_f_long <- melt(data_f,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time", "aoi.name"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="plt.face"
+        )
+# str(data_f_long)
+```
+```{r}
+data_f_long <- select(data_f_long, -aoi.name)
+id_visit <- colsplit(as.character(data_f_long$id), "_", c("id", "visit"))
+data_f_long <- cbind(id_visit, select(data_f_long, -id))
+data_f_long <- arrange(data_f_long, id, visit)
+# head(data_f_long)
+```
+
+## AOI = Noise
+
+```{r}
+datList <- cbfnp_matlabFile$temporalScores[[4]][[1]][,,2]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_n <- as.data.frame(datList.un[[2]])
+```
+```{r}
+names(data_n) <- ids
+```
+```{r}
+data_n$time <- time
+```
+```{r}
+data_n$aoi.name <- datList.un[[1]][,1]
+```
+```{r}
+# head(data_n[,c(1,ncol(data_n)-1,ncol(data_n))])
+```
+
+### Format data
+
+```{r}
+# names(data)
+data_n_long <- melt(data_n,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time", "aoi.name"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="plt.noise"
+        )
+# str(data_n_long)
+```
+```{r}
+data_n_long <- select(data_n_long, -aoi.name)
+id_visit <- colsplit(as.character(data_n_long$id), "_", c("id", "visit"))
+data_n_long <- cbind(id_visit, select(data_n_long, -id))
+data_n_long <- arrange(data_n_long, id, visit)
+# head(data_n_long)
+```
+
+## AOI = Phone
+
+```{r}
+datList <- cbfnp_matlabFile$temporalScores[[5]][[1]][,,3]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_p <- as.data.frame(datList.un[[2]])
+```
+```{r}
+names(data_p) <- ids
+```
+```{r}
+data_p$time <- time
+```
+```{r}
+data_p$aoi.name <- datList.un[[1]][,1]
+```
+```{r}
+# head(data_p[,c(1,ncol(data_p)-1,ncol(data_p))])
+```
+
+### Format data
+
+```{r}
+# names(data)
+data_p_long <- melt(data_p,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time", "aoi.name"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="plt.phone"
+        )
+# str(data_p_long)
+```
+```{r}
+data_p_long <- select(data_p_long, -aoi.name)
+id_visit <- colsplit(as.character(data_p_long$id), "_", c("id", "visit"))
+data_p_long <- cbind(id_visit, select(data_p_long, -id))
+data_p_long <- arrange(data_p_long, id, visit)
+# head(data_p_long)
+```
+
+## Merge datasets
+
+```{r}
+cb <- left_join(data_c_long, data_b_long, by=c("id", "time", "visit"))
+cbf <- left_join(cb, data_f_long, by=c("id", "time", "visit"))
+cbfn <- left_join(cbf, data_n_long, by=c("id", "time", "visit"))
+cbfnp <- left_join(cbfn, data_p_long, by=c("id", "time", "visit"))
+cbfnp.5 <- cbfnp %>%
+  mutate(stim=cbfnp_matlabFile$temporalScores[[25]][[1]][,1]) %>%
+  separate(col=stim, sep="_", into=c("cond", "trial")) %>%
+  mutate(trial=gsub(pattern = ".jpg", 
+                    replacement = "",
+                    x=trial),
+         trial=gsub(pattern = "Slide", 
+                    replacement = "",
+                    x=trial))
+# head(cbfnp.3)
+```
+
+```{r}
+rm(list=setdiff(ls(), ls(pattern = c("cbfnp"))))
+```
+
+# Trial 6
+
+## AOI = car
+
+```{r}
+datList <- cbfnp_matlabFile$temporal[[6]][[1]][,,5]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+ids <- lapply(cbfnp_matlabFile$temporal[[16]][[1]][,,1], unlist, use.names=FALSE)$ids
+time <- lapply(cbfnp_matlabFile$temporal[[16]][[1]][,,1], unlist, use.names=FALSE)$time
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_c <- as.data.frame(datList.un[[2]])
+```
+```{r}
+names(data_c) <- ids
+```
+```{r}
+data_c$time <- time
+```
+```{r}
+data_c$aoi.name <- datList.un[[1]][,1]
+```
+```{r}
+# head(data_c[,c(1,ncol(data_c)-1,ncol(data_c))])
+```
+
+### Format data
+
+```{r}
+# names(data)
+data_c_long <- melt(data_c,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time", "aoi.name"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="plt.car"
+        )
+# str(data_c_long)
+```
+```{r}
+data_c_long <- select(data_c_long, -aoi.name)
+id_visit <- colsplit(as.character(data_c_long$id), "_", c("id", "visit"))
+data_c_long <- cbind(id_visit, select(data_c_long, -id))
+data_c_long <- arrange(data_c_long, id, visit)
+# head(data_c_long)
+```
+
+## AOI = Bird
+
+```{r}
+datList <- cbfnp_matlabFile$temporal[[6]][[1]][,,4]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+# ids <- lapply(cbfnp_matlabFile$temporal[[11]][[1]][,,1], unlist, use.names=FALSE)$ids
+# time <- lapply(cbfnp_matlabFile$temporal[[11]][[1]][,,1], unlist, use.names=FALSE)$time
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_b <- as.data.frame(datList.un[[2]])
+```
+```{r}
+names(data_b) <- ids
+```
+```{r}
+data_b$time <- time
+```
+```{r}
+data_b$aoi.name <- datList.un[[1]][,1]
+```
+```{r}
+# head(data_b[,c(1,ncol(data_b)-1,ncol(data_b))])
+```
+
+### Format data
+
+```{r}
+# names(data)
+data_b_long <- melt(data_b,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time", "aoi.name"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="plt.bird"
+        )
+# str(data_b_long)
+```
+```{r}
+data_b_long <- select(data_b_long, -aoi.name)
+id_visit <- colsplit(as.character(data_b_long$id), "_", c("id", "visit"))
+data_b_long <- cbind(id_visit, select(data_b_long, -id))
+data_b_long <- arrange(data_b_long, id, visit)
+# head(data_c_long)
+```
+
+## AOI = Face
+
+```{r}
+datList <- cbfnp_matlabFile$temporalScores[[6]][[1]][,,1]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_f <- as.data.frame(datList.un[[2]])
+```
+```{r}
+names(data_f) <- ids
+```
+```{r}
+data_f$time <- time
+```
+```{r}
+data_f$aoi.name <- datList.un[[1]][,1]
+```
+```{r}
+# head(data_f[,c(1,ncol(data_f)-1,ncol(data_f))])
+```
+
+### Format data
+
+```{r}
+# names(data)
+data_f_long <- melt(data_f,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time", "aoi.name"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="plt.face"
+        )
+# str(data_f_long)
+```
+```{r}
+data_f_long <- select(data_f_long, -aoi.name)
+id_visit <- colsplit(as.character(data_f_long$id), "_", c("id", "visit"))
+data_f_long <- cbind(id_visit, select(data_f_long, -id))
+data_f_long <- arrange(data_f_long, id, visit)
+# head(data_f_long)
+```
+
+## AOI = Noise
+
+```{r}
+datList <- cbfnp_matlabFile$temporalScores[[6]][[1]][,,2]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_n <- as.data.frame(datList.un[[2]])
+```
+```{r}
+names(data_n) <- ids
+```
+```{r}
+data_n$time <- time
+```
+```{r}
+data_n$aoi.name <- datList.un[[1]][,1]
+```
+```{r}
+# head(data_n[,c(1,ncol(data_n)-1,ncol(data_n))])
+```
+
+### Format data
+
+```{r}
+# names(data)
+data_n_long <- melt(data_n,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time", "aoi.name"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="plt.noise"
+        )
+# str(data_n_long)
+```
+```{r}
+data_n_long <- select(data_n_long, -aoi.name)
+id_visit <- colsplit(as.character(data_n_long$id), "_", c("id", "visit"))
+data_n_long <- cbind(id_visit, select(data_n_long, -id))
+data_n_long <- arrange(data_n_long, id, visit)
+# head(data_n_long)
+```
+
+## AOI = Phone
+
+```{r}
+datList <- cbfnp_matlabFile$temporalScores[[6]][[1]][,,3]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_p <- as.data.frame(datList.un[[2]])
+```
+```{r}
+names(data_p) <- ids
+```
+```{r}
+data_p$time <- time
+```
+```{r}
+data_p$aoi.name <- datList.un[[1]][,1]
+```
+```{r}
+# head(data_p[,c(1,ncol(data_p)-1,ncol(data_p))])
+```
+
+### Format data
+
+```{r}
+# names(data)
+data_p_long <- melt(data_p,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time", "aoi.name"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="plt.phone"
+        )
+# str(data_p_long)
+```
+```{r}
+data_p_long <- select(data_p_long, -aoi.name)
+id_visit <- colsplit(as.character(data_p_long$id), "_", c("id", "visit"))
+data_p_long <- cbind(id_visit, select(data_p_long, -id))
+data_p_long <- arrange(data_p_long, id, visit)
+# head(data_p_long)
+```
+
+## Merge datasets
+
+```{r}
+cb <- left_join(data_c_long, data_b_long, by=c("id", "time", "visit"))
+cbf <- left_join(cb, data_f_long, by=c("id", "time", "visit"))
+cbfn <- left_join(cbf, data_n_long, by=c("id", "time", "visit"))
+cbfnp <- left_join(cbfn, data_p_long, by=c("id", "time", "visit"))
+cbfnp.6 <- cbfnp %>%
+  mutate(stim=cbfnp_matlabFile$temporalScores[[26]][[1]][,1]) %>%
+  separate(col=stim, sep="_", into=c("cond", "trial")) %>%
+  mutate(trial=gsub(pattern = ".jpg", 
+                    replacement = "",
+                    x=trial),
+         trial=gsub(pattern = "Slide", 
+                    replacement = "",
+                    x=trial))
+# head(cbfnp.3)
+```
+
+```{r}
+rm(list=setdiff(ls(), ls(pattern = c("cbfnp"))))
+```
+
+# Trial 7
+
+## AOI = car
+
+```{r}
+datList <- cbfnp_matlabFile$temporal[[7]][[1]][,,5]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+ids <- lapply(cbfnp_matlabFile$temporal[[17]][[1]][,,1], unlist, use.names=FALSE)$ids
+time <- lapply(cbfnp_matlabFile$temporal[[17]][[1]][,,1], unlist, use.names=FALSE)$time
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_c <- as.data.frame(datList.un[[2]])
+```
+```{r}
+names(data_c) <- ids
+```
+```{r}
+data_c$time <- time
+```
+```{r}
+data_c$aoi.name <- datList.un[[1]][,1]
+```
+```{r}
+# head(data_c[,c(1,ncol(data_c)-1,ncol(data_c))])
+```
+
+### Format data
+
+```{r}
+# names(data)
+data_c_long <- melt(data_c,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time", "aoi.name"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="plt.car"
+        )
+# str(data_c_long)
+```
+```{r}
+data_c_long <- select(data_c_long, -aoi.name)
+id_visit <- colsplit(as.character(data_c_long$id), "_", c("id", "visit"))
+data_c_long <- cbind(id_visit, select(data_c_long, -id))
+data_c_long <- arrange(data_c_long, id, visit)
+# head(data_c_long)
+```
+
+## AOI = Bird
+
+```{r}
+datList <- cbfnp_matlabFile$temporal[[7]][[1]][,,4]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+# ids <- lapply(cbfnp_matlabFile$temporal[[11]][[1]][,,1], unlist, use.names=FALSE)$ids
+# time <- lapply(cbfnp_matlabFile$temporal[[11]][[1]][,,1], unlist, use.names=FALSE)$time
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_b <- as.data.frame(datList.un[[2]])
+```
+```{r}
+names(data_b) <- ids
+```
+```{r}
+data_b$time <- time
+```
+```{r}
+data_b$aoi.name <- datList.un[[1]][,1]
+```
+```{r}
+# head(data_b[,c(1,ncol(data_b)-1,ncol(data_b))])
+```
+
+### Format data
+
+```{r}
+# names(data)
+data_b_long <- melt(data_b,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time", "aoi.name"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="plt.bird"
+        )
+# str(data_b_long)
+```
+```{r}
+data_b_long <- select(data_b_long, -aoi.name)
+id_visit <- colsplit(as.character(data_b_long$id), "_", c("id", "visit"))
+data_b_long <- cbind(id_visit, select(data_b_long, -id))
+data_b_long <- arrange(data_b_long, id, visit)
+# head(data_c_long)
+```
+
+## AOI = Face
+
+```{r}
+datList <- cbfnp_matlabFile$temporalScores[[7]][[1]][,,1]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_f <- as.data.frame(datList.un[[2]])
+```
+```{r}
+names(data_f) <- ids
+```
+```{r}
+data_f$time <- time
+```
+```{r}
+data_f$aoi.name <- datList.un[[1]][,1]
+```
+```{r}
+# head(data_f[,c(1,ncol(data_f)-1,ncol(data_f))])
+```
+
+### Format data
+
+```{r}
+# names(data)
+data_f_long <- melt(data_f,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time", "aoi.name"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="plt.face"
+        )
+# str(data_f_long)
+```
+```{r}
+data_f_long <- select(data_f_long, -aoi.name)
+id_visit <- colsplit(as.character(data_f_long$id), "_", c("id", "visit"))
+data_f_long <- cbind(id_visit, select(data_f_long, -id))
+data_f_long <- arrange(data_f_long, id, visit)
+# head(data_f_long)
+```
+
+## AOI = Noise
+
+```{r}
+datList <- cbfnp_matlabFile$temporalScores[[7]][[1]][,,2]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_n <- as.data.frame(datList.un[[2]])
+```
+```{r}
+names(data_n) <- ids
+```
+```{r}
+data_n$time <- time
+```
+```{r}
+data_n$aoi.name <- datList.un[[1]][,1]
+```
+```{r}
+# head(data_n[,c(1,ncol(data_n)-1,ncol(data_n))])
+```
+
+### Format data
+
+```{r}
+# names(data)
+data_n_long <- melt(data_n,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time", "aoi.name"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="plt.noise"
+        )
+# str(data_n_long)
+```
+```{r}
+data_n_long <- select(data_n_long, -aoi.name)
+id_visit <- colsplit(as.character(data_n_long$id), "_", c("id", "visit"))
+data_n_long <- cbind(id_visit, select(data_n_long, -id))
+data_n_long <- arrange(data_n_long, id, visit)
+# head(data_n_long)
+```
+
+## AOI = Phone
+
+```{r}
+datList <- cbfnp_matlabFile$temporalScores[[7]][[1]][,,3]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_p <- as.data.frame(datList.un[[2]])
+```
+```{r}
+names(data_p) <- ids
+```
+```{r}
+data_p$time <- time
+```
+```{r}
+data_p$aoi.name <- datList.un[[1]][,1]
+```
+```{r}
+# head(data_p[,c(1,ncol(data_p)-1,ncol(data_p))])
+```
+
+### Format data
+
+```{r}
+# names(data)
+data_p_long <- melt(data_p,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time", "aoi.name"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="plt.phone"
+        )
+# str(data_p_long)
+```
+```{r}
+data_p_long <- select(data_p_long, -aoi.name)
+id_visit <- colsplit(as.character(data_p_long$id), "_", c("id", "visit"))
+data_p_long <- cbind(id_visit, select(data_p_long, -id))
+data_p_long <- arrange(data_p_long, id, visit)
+# head(data_p_long)
+```
+
+## Merge datasets
+
+```{r}
+cb <- left_join(data_c_long, data_b_long, by=c("id", "time", "visit"))
+cbf <- left_join(cb, data_f_long, by=c("id", "time", "visit"))
+cbfn <- left_join(cbf, data_n_long, by=c("id", "time", "visit"))
+cbfnp <- left_join(cbfn, data_p_long, by=c("id", "time", "visit"))
+cbfnp.7 <- cbfnp %>%
+  mutate(stim=cbfnp_matlabFile$temporalScores[[27]][[1]][,1]) %>%
+  separate(col=stim, sep="_", into=c("cond", "trial")) %>%
+  mutate(trial=gsub(pattern = ".jpg", 
+                    replacement = "",
+                    x=trial),
+         trial=gsub(pattern = "Slide", 
+                    replacement = "",
+                    x=trial))
+# head(cbfnp.3)
+```
+
+```{r}
+rm(list=setdiff(ls(), ls(pattern = c("cbfnp"))))
+```
+
+# Trial 8
+
+## AOI = car
+
+```{r}
+datList <- cbfnp_matlabFile$temporal[[8]][[1]][,,5]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+ids <- lapply(cbfnp_matlabFile$temporal[[18]][[1]][,,1], unlist, use.names=FALSE)$ids
+time <- lapply(cbfnp_matlabFile$temporal[[18]][[1]][,,1], unlist, use.names=FALSE)$time
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_c <- as.data.frame(datList.un[[2]])
+```
+```{r}
+names(data_c) <- ids
+```
+```{r}
+data_c$time <- time
+```
+```{r}
+data_c$aoi.name <- datList.un[[1]][,1]
+```
+```{r}
+# head(data_c[,c(1,ncol(data_c)-1,ncol(data_c))])
+```
+
+### Format data
+
+```{r}
+# names(data)
+data_c_long <- melt(data_c,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time", "aoi.name"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="plt.car"
+        )
+# str(data_c_long)
+```
+```{r}
+data_c_long <- select(data_c_long, -aoi.name)
+id_visit <- colsplit(as.character(data_c_long$id), "_", c("id", "visit"))
+data_c_long <- cbind(id_visit, select(data_c_long, -id))
+data_c_long <- arrange(data_c_long, id, visit)
+# head(data_c_long)
+```
+
+## AOI = Bird
+
+```{r}
+datList <- cbfnp_matlabFile$temporal[[8]][[1]][,,4]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+# ids <- lapply(cbfnp_matlabFile$temporal[[11]][[1]][,,1], unlist, use.names=FALSE)$ids
+# time <- lapply(cbfnp_matlabFile$temporal[[11]][[1]][,,1], unlist, use.names=FALSE)$time
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_b <- as.data.frame(datList.un[[2]])
+```
+```{r}
+names(data_b) <- ids
+```
+```{r}
+data_b$time <- time
+```
+```{r}
+data_b$aoi.name <- datList.un[[1]][,1]
+```
+```{r}
+# head(data_b[,c(1,ncol(data_b)-1,ncol(data_b))])
+```
+
+### Format data
+
+```{r}
+# names(data)
+data_b_long <- melt(data_b,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time", "aoi.name"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="plt.bird"
+        )
+# str(data_b_long)
+```
+```{r}
+data_b_long <- select(data_b_long, -aoi.name)
+id_visit <- colsplit(as.character(data_b_long$id), "_", c("id", "visit"))
+data_b_long <- cbind(id_visit, select(data_b_long, -id))
+data_b_long <- arrange(data_b_long, id, visit)
+# head(data_c_long)
+```
+
+## AOI = Face
+
+```{r}
+datList <- cbfnp_matlabFile$temporalScores[[8]][[1]][,,1]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_f <- as.data.frame(datList.un[[2]])
+```
+```{r}
+names(data_f) <- ids
+```
+```{r}
+data_f$time <- time
+```
+```{r}
+data_f$aoi.name <- datList.un[[1]][,1]
+```
+```{r}
+# head(data_f[,c(1,ncol(data_f)-1,ncol(data_f))])
+```
+
+### Format data
+
+```{r}
+# names(data)
+data_f_long <- melt(data_f,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time", "aoi.name"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="plt.face"
+        )
+# str(data_f_long)
+```
+```{r}
+data_f_long <- select(data_f_long, -aoi.name)
+id_visit <- colsplit(as.character(data_f_long$id), "_", c("id", "visit"))
+data_f_long <- cbind(id_visit, select(data_f_long, -id))
+data_f_long <- arrange(data_f_long, id, visit)
+# head(data_f_long)
+```
+
+## AOI = Noise
+
+```{r}
+datList <- cbfnp_matlabFile$temporalScores[[8]][[1]][,,2]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_n <- as.data.frame(datList.un[[2]])
+```
+```{r}
+names(data_n) <- ids
+```
+```{r}
+data_n$time <- time
+```
+```{r}
+data_n$aoi.name <- datList.un[[1]][,1]
+```
+```{r}
+# head(data_n[,c(1,ncol(data_n)-1,ncol(data_n))])
+```
+
+### Format data
+
+```{r}
+# names(data)
+data_n_long <- melt(data_n,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time", "aoi.name"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="plt.noise"
+        )
+# str(data_n_long)
+```
+```{r}
+data_n_long <- select(data_n_long, -aoi.name)
+id_visit <- colsplit(as.character(data_n_long$id), "_", c("id", "visit"))
+data_n_long <- cbind(id_visit, select(data_n_long, -id))
+data_n_long <- arrange(data_n_long, id, visit)
+# head(data_n_long)
+```
+
+## AOI = Phone
+
+```{r}
+datList <- cbfnp_matlabFile$temporalScores[[8]][[1]][,,3]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_p <- as.data.frame(datList.un[[2]])
+```
+```{r}
+names(data_p) <- ids
+```
+```{r}
+data_p$time <- time
+```
+```{r}
+data_p$aoi.name <- datList.un[[1]][,1]
+```
+```{r}
+# head(data_p[,c(1,ncol(data_p)-1,ncol(data_p))])
+```
+
+### Format data
+
+```{r}
+# names(data)
+data_p_long <- melt(data_p,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time", "aoi.name"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="plt.phone"
+        )
+# str(data_p_long)
+```
+```{r}
+data_p_long <- select(data_p_long, -aoi.name)
+id_visit <- colsplit(as.character(data_p_long$id), "_", c("id", "visit"))
+data_p_long <- cbind(id_visit, select(data_p_long, -id))
+data_p_long <- arrange(data_p_long, id, visit)
+# head(data_p_long)
+```
+
+## Merge datasets
+
+```{r}
+cb <- left_join(data_c_long, data_b_long, by=c("id", "time", "visit"))
+cbf <- left_join(cb, data_f_long, by=c("id", "time", "visit"))
+cbfn <- left_join(cbf, data_n_long, by=c("id", "time", "visit"))
+cbfnp <- left_join(cbfn, data_p_long, by=c("id", "time", "visit"))
+cbfnp.8 <- cbfnp %>%
+  mutate(stim=cbfnp_matlabFile$temporalScores[[28]][[1]][,1]) %>%
+  separate(col=stim, sep="_", into=c("cond", "trial")) %>%
+  mutate(trial=gsub(pattern = ".jpg", 
+                    replacement = "",
+                    x=trial),
+         trial=gsub(pattern = "Slide", 
+                    replacement = "",
+                    x=trial))
+# head(cbfnp.3)
+```
+
+```{r}
+rm(list=setdiff(ls(), ls(pattern = c("cbfnp"))))
+```
+
+# Trial 9
+
+## AOI = car
+
+```{r}
+datList <- cbfnp_matlabFile$temporal[[9]][[1]][,,5]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+ids <- lapply(cbfnp_matlabFile$temporal[[19]][[1]][,,1], unlist, use.names=FALSE)$ids
+time <- lapply(cbfnp_matlabFile$temporal[[19]][[1]][,,1], unlist, use.names=FALSE)$time
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_c <- as.data.frame(datList.un[[2]])
+```
+```{r}
+names(data_c) <- ids
+```
+```{r}
+data_c$time <- time
+```
+```{r}
+data_c$aoi.name <- datList.un[[1]][,1]
+```
+```{r}
+# head(data_c[,c(1,ncol(data_c)-1,ncol(data_c))])
+```
+
+### Format data
+
+```{r}
+# names(data)
+data_c_long <- melt(data_c,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time", "aoi.name"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="plt.car"
+        )
+# str(data_c_long)
+```
+```{r}
+data_c_long <- select(data_c_long, -aoi.name)
+id_visit <- colsplit(as.character(data_c_long$id), "_", c("id", "visit"))
+data_c_long <- cbind(id_visit, select(data_c_long, -id))
+data_c_long <- arrange(data_c_long, id, visit)
+# head(data_c_long)
+```
+
+## AOI = Bird
+
+```{r}
+datList <- cbfnp_matlabFile$temporal[[9]][[1]][,,4]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+# ids <- lapply(cbfnp_matlabFile$temporal[[11]][[1]][,,1], unlist, use.names=FALSE)$ids
+# time <- lapply(cbfnp_matlabFile$temporal[[11]][[1]][,,1], unlist, use.names=FALSE)$time
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_b <- as.data.frame(datList.un[[2]])
+```
+```{r}
+names(data_b) <- ids
+```
+```{r}
+data_b$time <- time
+```
+```{r}
+data_b$aoi.name <- datList.un[[1]][,1]
+```
+```{r}
+# head(data_b[,c(1,ncol(data_b)-1,ncol(data_b))])
+```
+
+### Format data
+
+```{r}
+# names(data)
+data_b_long <- melt(data_b,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time", "aoi.name"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="plt.bird"
+        )
+# str(data_b_long)
+```
+```{r}
+data_b_long <- select(data_b_long, -aoi.name)
+id_visit <- colsplit(as.character(data_b_long$id), "_", c("id", "visit"))
+data_b_long <- cbind(id_visit, select(data_b_long, -id))
+data_b_long <- arrange(data_b_long, id, visit)
+# head(data_c_long)
+```
+
+## AOI = Face
+
+```{r}
+datList <- cbfnp_matlabFile$temporalScores[[9]][[1]][,,1]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_f <- as.data.frame(datList.un[[2]])
+```
+```{r}
+names(data_f) <- ids
+```
+```{r}
+data_f$time <- time
+```
+```{r}
+data_f$aoi.name <- datList.un[[1]][,1]
+```
+```{r}
+# head(data_f[,c(1,ncol(data_f)-1,ncol(data_f))])
+```
+
+### Format data
+
+```{r}
+# names(data)
+data_f_long <- melt(data_f,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time", "aoi.name"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="plt.face"
+        )
+# str(data_f_long)
+```
+```{r}
+data_f_long <- select(data_f_long, -aoi.name)
+id_visit <- colsplit(as.character(data_f_long$id), "_", c("id", "visit"))
+data_f_long <- cbind(id_visit, select(data_f_long, -id))
+data_f_long <- arrange(data_f_long, id, visit)
+# head(data_f_long)
+```
+
+## AOI = Noise
+
+```{r}
+datList <- cbfnp_matlabFile$temporalScores[[9]][[1]][,,2]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_n <- as.data.frame(datList.un[[2]])
+```
+```{r}
+names(data_n) <- ids
+```
+```{r}
+data_n$time <- time
+```
+```{r}
+data_n$aoi.name <- datList.un[[1]][,1]
+```
+```{r}
+# head(data_n[,c(1,ncol(data_n)-1,ncol(data_n))])
+```
+
+### Format data
+
+```{r}
+# names(data)
+data_n_long <- melt(data_n,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time", "aoi.name"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="plt.noise"
+        )
+# str(data_n_long)
+```
+```{r}
+data_n_long <- select(data_n_long, -aoi.name)
+id_visit <- colsplit(as.character(data_n_long$id), "_", c("id", "visit"))
+data_n_long <- cbind(id_visit, select(data_n_long, -id))
+data_n_long <- arrange(data_n_long, id, visit)
+# head(data_n_long)
+```
+
+## AOI = Phone
+
+```{r}
+datList <- cbfnp_matlabFile$temporalScores[[9]][[1]][,,3]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_p <- as.data.frame(datList.un[[2]])
+```
+```{r}
+names(data_p) <- ids
+```
+```{r}
+data_p$time <- time
+```
+```{r}
+data_p$aoi.name <- datList.un[[1]][,1]
+```
+```{r}
+# head(data_p[,c(1,ncol(data_p)-1,ncol(data_p))])
+```
+
+### Format data
+
+```{r}
+# names(data)
+data_p_long <- melt(data_p,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time", "aoi.name"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="plt.phone"
+        )
+# str(data_p_long)
+```
+```{r}
+data_p_long <- select(data_p_long, -aoi.name)
+id_visit <- colsplit(as.character(data_p_long$id), "_", c("id", "visit"))
+data_p_long <- cbind(id_visit, select(data_p_long, -id))
+data_p_long <- arrange(data_p_long, id, visit)
+# head(data_p_long)
+```
+
+## Merge datasets
+
+```{r}
+cb <- left_join(data_c_long, data_b_long, by=c("id", "time", "visit"))
+cbf <- left_join(cb, data_f_long, by=c("id", "time", "visit"))
+cbfn <- left_join(cbf, data_n_long, by=c("id", "time", "visit"))
+cbfnp <- left_join(cbfn, data_p_long, by=c("id", "time", "visit"))
+cbfnp.9 <- cbfnp %>%
+  mutate(stim=cbfnp_matlabFile$temporalScores[[29]][[1]][,1]) %>%
+  separate(col=stim, sep="_", into=c("cond", "trial")) %>%
+  mutate(trial=gsub(pattern = ".jpg", 
+                    replacement = "",
+                    x=trial),
+         trial=gsub(pattern = "Slide", 
+                    replacement = "",
+                    x=trial))
+# head(cbfnp.3)
+```
+
+```{r}
+rm(list=setdiff(ls(), ls(pattern = c("cbfnp"))))
+```
+
+# Trial 10
+
+## AOI = car
+
+```{r}
+datList <- cbfnp_matlabFile$temporal[[10]][[1]][,,5]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+ids <- lapply(cbfnp_matlabFile$temporal[[20]][[1]][,,1], unlist, use.names=FALSE)$ids
+time <- lapply(cbfnp_matlabFile$temporal[[20]][[1]][,,1], unlist, use.names=FALSE)$time
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_c <- as.data.frame(datList.un[[2]])
+```
+```{r}
+names(data_c) <- ids
+```
+```{r}
+data_c$time <- time
+```
+```{r}
+data_c$aoi.name <- datList.un[[1]][,1]
+```
+```{r}
+# head(data_c[,c(1,ncol(data_c)-1,ncol(data_c))])
+```
+
+### Format data
+
+```{r}
+# names(data)
+data_c_long <- melt(data_c,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time", "aoi.name"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="plt.car"
+        )
+# str(data_c_long)
+```
+```{r}
+data_c_long <- select(data_c_long, -aoi.name)
+id_visit <- colsplit(as.character(data_c_long$id), "_", c("id", "visit"))
+data_c_long <- cbind(id_visit, select(data_c_long, -id))
+data_c_long <- arrange(data_c_long, id, visit)
+# head(data_c_long)
+```
+
+## AOI = Bird
+
+```{r}
+datList <- cbfnp_matlabFile$temporal[[10]][[1]][,,4]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+# ids <- lapply(cbfnp_matlabFile$temporal[[11]][[1]][,,1], unlist, use.names=FALSE)$ids
+# time <- lapply(cbfnp_matlabFile$temporal[[11]][[1]][,,1], unlist, use.names=FALSE)$time
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_b <- as.data.frame(datList.un[[2]])
+```
+```{r}
+names(data_b) <- ids
+```
+```{r}
+data_b$time <- time
+```
+```{r}
+data_b$aoi.name <- datList.un[[1]][,1]
+```
+```{r}
+# head(data_b[,c(1,ncol(data_b)-1,ncol(data_b))])
+```
+
+### Format data
+
+```{r}
+# names(data)
+data_b_long <- melt(data_b,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time", "aoi.name"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="plt.bird"
+        )
+# str(data_b_long)
+```
+```{r}
+data_b_long <- select(data_b_long, -aoi.name)
+id_visit <- colsplit(as.character(data_b_long$id), "_", c("id", "visit"))
+data_b_long <- cbind(id_visit, select(data_b_long, -id))
+data_b_long <- arrange(data_b_long, id, visit)
+# head(data_c_long)
+```
+
+## AOI = Face
+
+```{r}
+datList <- cbfnp_matlabFile$temporalScores[[10]][[1]][,,1]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_f <- as.data.frame(datList.un[[2]])
+```
+```{r}
+names(data_f) <- ids
+```
+```{r}
+data_f$time <- time
+```
+```{r}
+data_f$aoi.name <- datList.un[[1]][,1]
+```
+```{r}
+# head(data_f[,c(1,ncol(data_f)-1,ncol(data_f))])
+```
+
+### Format data
+
+```{r}
+# names(data)
+data_f_long <- melt(data_f,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time", "aoi.name"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="plt.face"
+        )
+# str(data_f_long)
+```
+```{r}
+data_f_long <- select(data_f_long, -aoi.name)
+id_visit <- colsplit(as.character(data_f_long$id), "_", c("id", "visit"))
+data_f_long <- cbind(id_visit, select(data_f_long, -id))
+data_f_long <- arrange(data_f_long, id, visit)
+# head(data_f_long)
+```
+
+## AOI = Noise
+
+```{r}
+datList <- cbfnp_matlabFile$temporalScores[[10]][[1]][,,2]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_n <- as.data.frame(datList.un[[2]])
+```
+```{r}
+names(data_n) <- ids
+```
+```{r}
+data_n$time <- time
+```
+```{r}
+data_n$aoi.name <- datList.un[[1]][,1]
+```
+```{r}
+# head(data_n[,c(1,ncol(data_n)-1,ncol(data_n))])
+```
+
+### Format data
+
+```{r}
+# names(data)
+data_n_long <- melt(data_n,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time", "aoi.name"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="plt.noise"
+        )
+# str(data_n_long)
+```
+```{r}
+data_n_long <- select(data_n_long, -aoi.name)
+id_visit <- colsplit(as.character(data_n_long$id), "_", c("id", "visit"))
+data_n_long <- cbind(id_visit, select(data_n_long, -id))
+data_n_long <- arrange(data_n_long, id, visit)
+# head(data_n_long)
+```
+
+## AOI = Phone
+
+```{r}
+datList <- cbfnp_matlabFile$temporalScores[[10]][[1]][,,3]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_p <- as.data.frame(datList.un[[2]])
+```
+```{r}
+names(data_p) <- ids
+```
+```{r}
+data_p$time <- time
+```
+```{r}
+data_p$aoi.name <- datList.un[[1]][,1]
+```
+```{r}
+# head(data_p[,c(1,ncol(data_p)-1,ncol(data_p))])
+```
+
+### Format data
+
+```{r}
+# names(data)
+data_p_long <- melt(data_p,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time", "aoi.name"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="plt.phone"
+        )
+# str(data_p_long)
+```
+```{r}
+data_p_long <- select(data_p_long, -aoi.name)
+id_visit <- colsplit(as.character(data_p_long$id), "_", c("id", "visit"))
+data_p_long <- cbind(id_visit, select(data_p_long, -id))
+data_p_long <- arrange(data_p_long, id, visit)
+# head(data_p_long)
+```
+
+## Merge datasets
+
+```{r}
+cb <- left_join(data_c_long, data_b_long, by=c("id", "time", "visit"))
+cbf <- left_join(cb, data_f_long, by=c("id", "time", "visit"))
+cbfn <- left_join(cbf, data_n_long, by=c("id", "time", "visit"))
+cbfnp <- left_join(cbfn, data_p_long, by=c("id", "time", "visit"))
+cbfnp.10 <- cbfnp %>%
+  mutate(stim=cbfnp_matlabFile$temporalScores[[30]][[1]][,1]) %>%
+  separate(col=stim, sep="_", into=c("cond", "trial")) %>%
+  mutate(trial=gsub(pattern = ".jpg", 
+                    replacement = "",
+                    x=trial),
+         trial=gsub(pattern = "Slide", 
+                    replacement = "",
+                    x=trial))
+# head(cbfnp.3)
+```
+
+```{r}
+rm(list=setdiff(ls(), ls(pattern = c("cbfnp"))))
+```
+
+#Attach datasets together
+
+```{r}
+cbfnp.ph2 <- rbind(cbfnp.1,
+               cbfnp.2,
+               cbfnp.3,
+               cbfnp.4,
+               cbfnp.5,
+               cbfnp.6,
+               cbfnp.7,
+               cbfnp.8,
+               cbfnp.9,
+               cbfnp.10)
+```
+
+# Save the big dataset
+
+```{r}
+save(cbfnp, cbfnp.ph2, file = "SavedWS/cbfnp.RData")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

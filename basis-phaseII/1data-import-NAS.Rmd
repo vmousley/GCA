@@ -1,0 +1,948 @@
+---
+title: "Data Import NANS"
+author: "Teresa Del Bianco"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+# Load packages 
+
+```{r, messvisit = FALSE, warning = FALSE, include = FALSE}
+packs <- c("R.matlab", "reshape2", "dplyr", "multidplyr", "ggplot2", "tidyr")
+lapply(packs, require, character.only = TRUE)
+```
+
+# Read data from matlab (? Hz)
+
+```{r}
+cbfnp_matlabFile  <- readMat('MatFiles/ph2_popout_20200203T210725.mat')
+# str(cbfnp_matlabFile)
+```
+
+# Trial 1
+
+```{r}
+datList <- cbfnp_matlabFile$temporal[[11]][[1]][,,1]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+ids <- datList.un$ids
+time <- datList.un$time
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_missing <- as.data.frame(datList.un$missing)
+data_absent <- as.data.frame(datList.un$absent)
+```
+```{r}
+names(data_missing) <- ids
+names(data_absent) <- ids
+```
+```{r}
+data_missing$time <- time
+data_absent$time <- time
+```
+
+## Format data
+
+### Missing
+
+```{r}
+# names(data)
+data_missing_long <- melt(data_missing,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="missing"
+        )
+# str(data_c_long)
+```
+```{r}
+id_visit <- colsplit(as.character(data_missing_long$id), "_", c("id", "visit"))
+data_missing_long <- cbind(id_visit, dplyr::select(data_missing_long, -id))
+```
+
+### Absent
+
+```{r}
+# names(data)
+data_absent_long <- melt(data_absent,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="absent"
+        )
+# str(data_c_long)
+```
+```{r}
+id_visit <- colsplit(as.character(data_absent_long$id), "_", c("id", "visit"))
+data_absent_long <- cbind(id_visit, dplyr::select(data_absent_long, -id))
+```
+
+## Merge Missing and Absent
+
+```{r}
+nrow(data_missing_long)-nrow(data_absent_long)
+data_miss_abs_1 <- inner_join(data_missing_long, data_absent_long, by=c("id", "visit", "time"))
+
+nrow(data_miss_abs_1)-nrow(data_missing_long)
+```
+
+## Add trial
+
+```{r}
+data_miss_abs_1$stim <- cbfnp_matlabFile$temporalScores[[21]][[1]][,1]
+```
+
+
+
+
+# Trial 2
+
+```{r}
+datList <- cbfnp_matlabFile$temporal[[12]][[1]][,,1]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+ids <- datList.un$ids
+time <- datList.un$time
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_missing <- as.data.frame(datList.un$missing)
+data_absent <- as.data.frame(datList.un$absent)
+```
+```{r}
+names(data_missing) <- ids
+names(data_absent) <- ids
+```
+```{r}
+data_missing$time <- time
+data_absent$time <- time
+```
+
+## Format data
+
+### Missing
+
+```{r}
+# names(data)
+data_missing_long <- melt(data_missing,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="missing"
+        )
+# str(data_c_long)
+```
+```{r}
+id_visit <- colsplit(as.character(data_missing_long$id), "_", c("id", "visit"))
+data_missing_long <- cbind(id_visit, dplyr::select(data_missing_long, -id))
+```
+
+### Absent
+
+```{r}
+# names(data)
+data_absent_long <- melt(data_absent,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="absent"
+        )
+# str(data_c_long)
+```
+```{r}
+id_visit <- colsplit(as.character(data_absent_long$id), "_", c("id", "visit"))
+data_absent_long <- cbind(id_visit, dplyr::select(data_absent_long, -id))
+```
+
+## Merge Missing and Absent
+
+```{r}
+nrow(data_missing_long)-nrow(data_absent_long)
+data_miss_abs_2 <- inner_join(data_missing_long, data_absent_long, by=c("id", "visit", "time"))
+```
+
+## Add trial
+
+```{r}
+data_miss_abs_2$stim <- cbfnp_matlabFile$temporalScores[[22]][[1]][,1]
+```
+
+# Trial 3
+
+```{r}
+datList <- cbfnp_matlabFile$temporal[[13]][[1]][,,1]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+ids <- datList.un$ids
+time <- datList.un$time
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_missing <- as.data.frame(datList.un$missing)
+data_absent <- as.data.frame(datList.un$absent)
+```
+```{r}
+names(data_missing) <- ids
+names(data_absent) <- ids
+```
+```{r}
+data_missing$time <- time
+data_absent$time <- time
+```
+
+## Format data
+
+### Missing
+
+```{r}
+# names(data)
+data_missing_long <- melt(data_missing,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="missing"
+        )
+# str(data_c_long)
+```
+```{r}
+id_visit <- colsplit(as.character(data_missing_long$id), "_", c("id", "visit"))
+data_missing_long <- cbind(id_visit, dplyr::select(data_missing_long, -id))
+```
+
+### Absent
+
+```{r}
+# names(data)
+data_absent_long <- melt(data_absent,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="absent"
+        )
+# str(data_c_long)
+```
+```{r}
+id_visit <- colsplit(as.character(data_absent_long$id), "_", c("id", "visit"))
+data_absent_long <- cbind(id_visit, dplyr::select(data_absent_long, -id))
+```
+
+## Merge Missing and Absent
+
+```{r}
+nrow(data_missing_long)-nrow(data_absent_long)
+data_miss_abs_3 <- inner_join(data_missing_long, data_absent_long, by=c("id", "visit", "time"))
+```
+
+## Add trial
+
+```{r}
+data_miss_abs_3$stim <- cbfnp_matlabFile$temporalScores[[23]][[1]][,1]
+```
+
+
+# Trial 4
+
+```{r}
+datList <- cbfnp_matlabFile$temporal[[14]][[1]][,,1]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+ids <- datList.un$ids
+time <- datList.un$time
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_missing <- as.data.frame(datList.un$missing)
+data_absent <- as.data.frame(datList.un$absent)
+```
+```{r}
+names(data_missing) <- ids
+names(data_absent) <- ids
+```
+```{r}
+data_missing$time <- time
+data_absent$time <- time
+```
+
+## Format data
+
+### Missing
+
+```{r}
+# names(data)
+data_missing_long <- melt(data_missing,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="missing"
+        )
+# str(data_c_long)
+```
+```{r}
+id_visit <- colsplit(as.character(data_missing_long$id), "_", c("id", "visit"))
+data_missing_long <- cbind(id_visit, dplyr::select(data_missing_long, -id))
+```
+
+### Absent
+
+```{r}
+# names(data)
+data_absent_long <- melt(data_absent,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="absent"
+        )
+# str(data_c_long)
+```
+```{r}
+id_visit <- colsplit(as.character(data_absent_long$id), "_", c("id", "visit"))
+data_absent_long <- cbind(id_visit, dplyr::select(data_absent_long, -id))
+```
+
+## Merge Missing and Absent
+
+```{r}
+nrow(data_missing_long)-nrow(data_absent_long)
+data_miss_abs_4 <- inner_join(data_missing_long, data_absent_long, by=c("id", "visit", "time"))
+```
+
+## Add trial
+
+```{r}
+data_miss_abs_4$stim <- cbfnp_matlabFile$temporalScores[[24]][[1]][,1]
+```
+
+# Trial 5
+
+```{r}
+datList <- cbfnp_matlabFile$temporal[[15]][[1]][,,1]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+ids <- datList.un$ids
+time <- datList.un$time
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_missing <- as.data.frame(datList.un$missing)
+data_absent <- as.data.frame(datList.un$absent)
+```
+```{r}
+names(data_missing) <- ids
+names(data_absent) <- ids
+```
+```{r}
+data_missing$time <- time
+data_absent$time <- time
+```
+
+## Format data
+
+### Missing
+
+```{r}
+# names(data)
+data_missing_long <- melt(data_missing,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="missing"
+        )
+# str(data_c_long)
+```
+```{r}
+id_visit <- colsplit(as.character(data_missing_long$id), "_", c("id", "visit"))
+data_missing_long <- cbind(id_visit, dplyr::select(data_missing_long, -id))
+```
+
+### Absent
+
+```{r}
+# names(data)
+data_absent_long <- melt(data_absent,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="absent"
+        )
+# str(data_c_long)
+```
+```{r}
+id_visit <- colsplit(as.character(data_absent_long$id), "_", c("id", "visit"))
+data_absent_long <- cbind(id_visit, dplyr::select(data_absent_long, -id))
+```
+
+## Merge Missing and Absent
+
+```{r}
+nrow(data_missing_long)-nrow(data_absent_long)
+data_miss_abs_5 <- inner_join(data_missing_long, data_absent_long, by=c("id", "visit", "time"))
+```
+
+## Add trial
+
+```{r}
+data_miss_abs_5$stim <- cbfnp_matlabFile$temporalScores[[25]][[1]][,1]
+```
+
+# Trial 6
+
+```{r}
+datList <- cbfnp_matlabFile$temporal[[16]][[1]][,,1]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+ids <- datList.un$ids
+time <- datList.un$time
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_missing <- as.data.frame(datList.un$missing)
+data_absent <- as.data.frame(datList.un$absent)
+```
+```{r}
+names(data_missing) <- ids
+names(data_absent) <- ids
+```
+```{r}
+data_missing$time <- time
+data_absent$time <- time
+```
+
+## Format data
+
+### Missing
+
+```{r}
+# names(data)
+data_missing_long <- melt(data_missing,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="missing"
+        )
+# str(data_c_long)
+```
+```{r}
+id_visit <- colsplit(as.character(data_missing_long$id), "_", c("id", "visit"))
+data_missing_long <- cbind(id_visit, dplyr::select(data_missing_long, -id))
+```
+
+### Absent
+
+```{r}
+# names(data)
+data_absent_long <- melt(data_absent,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="absent"
+        )
+# str(data_c_long)
+```
+```{r}
+id_visit <- colsplit(as.character(data_absent_long$id), "_", c("id", "visit"))
+data_absent_long <- cbind(id_visit, dplyr::select(data_absent_long, -id))
+```
+
+## Merge Missing and Absent
+
+```{r}
+nrow(data_missing_long)-nrow(data_absent_long)
+data_miss_abs_6 <- inner_join(data_missing_long, data_absent_long, by=c("id", "visit", "time"))
+```
+
+## Add trial
+
+```{r}
+data_miss_abs_6$stim <- cbfnp_matlabFile$temporalScores[[26]][[1]][,1]
+```
+
+
+# Trial 7
+
+```{r}
+datList <- cbfnp_matlabFile$temporal[[17]][[1]][,,1]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+ids <- datList.un$ids
+time <- datList.un$time
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_missing <- as.data.frame(datList.un$missing)
+data_absent <- as.data.frame(datList.un$absent)
+```
+```{r}
+names(data_missing) <- ids
+names(data_absent) <- ids
+```
+```{r}
+data_missing$time <- time
+data_absent$time <- time
+```
+
+## Format data
+
+### Missing
+
+```{r}
+# names(data)
+data_missing_long <- melt(data_missing,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="missing"
+        )
+# str(data_c_long)
+```
+```{r}
+id_visit <- colsplit(as.character(data_missing_long$id), "_", c("id", "visit"))
+data_missing_long <- cbind(id_visit, dplyr::select(data_missing_long, -id))
+```
+
+### Absent
+
+```{r}
+# names(data)
+data_absent_long <- melt(data_absent,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="absent"
+        )
+# str(data_c_long)
+```
+```{r}
+id_visit <- colsplit(as.character(data_absent_long$id), "_", c("id", "visit"))
+data_absent_long <- cbind(id_visit, dplyr::select(data_absent_long, -id))
+```
+
+## Merge Missing and Absent
+
+```{r}
+nrow(data_missing_long)-nrow(data_absent_long)
+data_miss_abs_7 <- inner_join(data_missing_long, data_absent_long, by=c("id", "visit", "time"))
+```
+
+## Add trial
+
+```{r}
+data_miss_abs_7$stim <- cbfnp_matlabFile$temporalScores[[27]][[1]][,1]
+```
+
+
+# Trial 8
+
+```{r}
+datList <- cbfnp_matlabFile$temporal[[18]][[1]][,,1]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+ids <- datList.un$ids
+time <- datList.un$time
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_missing <- as.data.frame(datList.un$missing)
+data_absent <- as.data.frame(datList.un$absent)
+```
+```{r}
+names(data_missing) <- ids
+names(data_absent) <- ids
+```
+```{r}
+data_missing$time <- time
+data_absent$time <- time
+```
+
+## Format data
+
+### Missing
+
+```{r}
+# names(data)
+data_missing_long <- melt(data_missing,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="missing"
+        )
+# str(data_c_long)
+```
+```{r}
+id_visit <- colsplit(as.character(data_missing_long$id), "_", c("id", "visit"))
+data_missing_long <- cbind(id_visit, dplyr::select(data_missing_long, -id))
+```
+
+### Absent
+
+```{r}
+# names(data)
+data_absent_long <- melt(data_absent,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="absent"
+        )
+# str(data_c_long)
+```
+```{r}
+id_visit <- colsplit(as.character(data_absent_long$id), "_", c("id", "visit"))
+data_absent_long <- cbind(id_visit, dplyr::select(data_absent_long, -id))
+```
+
+## Merge Missing and Absent
+
+```{r}
+nrow(data_missing_long)-nrow(data_absent_long)
+data_miss_abs_8 <- inner_join(data_missing_long, data_absent_long, by=c("id", "visit", "time"))
+```
+
+## Add trial
+
+```{r}
+data_miss_abs_8$stim <- cbfnp_matlabFile$temporalScores[[28]][[1]][,1]
+```
+
+# Trial 9
+
+```{r}
+datList <- cbfnp_matlabFile$temporal[[19]][[1]][,,1]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+ids <- datList.un$ids
+time <- datList.un$time
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_missing <- as.data.frame(datList.un$missing)
+data_absent <- as.data.frame(datList.un$absent)
+```
+```{r}
+names(data_missing) <- ids
+names(data_absent) <- ids
+```
+```{r}
+data_missing$time <- time
+data_absent$time <- time
+```
+
+## Format data
+
+### Missing
+
+```{r}
+# names(data)
+data_missing_long <- melt(data_missing,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="missing"
+        )
+# str(data_c_long)
+```
+```{r}
+id_visit <- colsplit(as.character(data_missing_long$id), "_", c("id", "visit"))
+data_missing_long <- cbind(id_visit, dplyr::select(data_missing_long, -id))
+```
+
+### Absent
+
+```{r}
+# names(data)
+data_absent_long <- melt(data_absent,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="absent"
+        )
+# str(data_c_long)
+```
+```{r}
+id_visit <- colsplit(as.character(data_absent_long$id), "_", c("id", "visit"))
+data_absent_long <- cbind(id_visit, dplyr::select(data_absent_long, -id))
+```
+
+## Merge Missing and Absent
+
+```{r}
+nrow(data_missing_long)-nrow(data_absent_long)
+data_miss_abs_9 <- inner_join(data_missing_long, data_absent_long, by=c("id", "visit", "time"))
+```
+
+## Add trial
+
+```{r}
+data_miss_abs_9$stim <- cbfnp_matlabFile$temporalScores[[29]][[1]][,1]
+```
+
+# Trial 10
+
+```{r}
+datList <- cbfnp_matlabFile$temporal[[20]][[1]][,,1]
+# summary(datList)
+```
+```{r}
+datList.un <- lapply(datList, unlist, use.names=FALSE)
+ids <- datList.un$ids
+time <- datList.un$time
+# summary(datList.un)
+# str(datList.un)
+```
+```{r}
+data_missing <- as.data.frame(datList.un$missing)
+data_absent <- as.data.frame(datList.un$absent)
+```
+```{r}
+names(data_missing) <- ids
+names(data_absent) <- ids
+```
+```{r}
+data_missing$time <- time
+data_absent$time <- time
+```
+
+## Format data
+
+### Missing
+
+```{r}
+# names(data)
+data_missing_long <- melt(data_missing,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="missing"
+        )
+# str(data_c_long)
+```
+```{r}
+id_visit <- colsplit(as.character(data_missing_long$id), "_", c("id", "visit"))
+data_missing_long <- cbind(id_visit, dplyr::select(data_missing_long, -id))
+```
+
+### Absent
+
+```{r}
+# names(data)
+data_absent_long <- melt(data_absent,
+        # ID variables - all the variables to keep but not split apart on
+        id.vars=c("time"),
+        # The source columns
+        # measure.vars=c("control", "cond1", "cond2" ),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+        variable.name="id",
+        value.name="absent"
+        )
+# str(data_c_long)
+```
+```{r}
+id_visit <- colsplit(as.character(data_absent_long$id), "_", c("id", "visit"))
+data_absent_long <- cbind(id_visit, dplyr::select(data_absent_long, -id))
+```
+
+## Merge Missing and Absent
+
+```{r}
+nrow(data_missing_long)-nrow(data_absent_long)
+data_miss_abs_10 <- inner_join(data_missing_long, data_absent_long, by=c("id", "visit", "time"))
+```
+
+## Add trial
+
+```{r}
+data_miss_abs_10$stim <- cbfnp_matlabFile$temporalScores[[30]][[1]][,1]
+```
+
+Merge all trials together
+
+```{r}
+data_miss_abs <- rbind(data_miss_abs_1,
+                       data_miss_abs_2,
+                       data_miss_abs_3,
+                       data_miss_abs_4,
+                       data_miss_abs_5,
+                       data_miss_abs_6,
+                       data_miss_abs_7,
+                       data_miss_abs_8,
+                       data_miss_abs_9,
+                       data_miss_abs_10)
+```
+
+```{r}
+data_miss_abs <- data_miss_abs %>%
+  separate(col = stim, into = c("cond", "trial"), sep = "_", remove = FALSE) %>%
+  mutate(trial=gsub(pattern = "Slide", replacement = "", x = trial),
+         trial=gsub(pattern = ".jpg", replacement = "", x = trial))
+```
+
+
+# Look at the missing data
+
+```{r}
+data_miss_abs %>%
+  filter(absent==1 & missing==1) #ok
+```
+
+```{r}
+not_pres <- data_miss_abs %>%
+  filter(absent==1) %>%
+  distinct(id, visit, time, stim, cond, trial, absent)
+head(not_pres)
+```
+
+```{r}
+p_NA <- data_miss_abs %>%
+  group_by(id, visit, stim, cond, trial) %>%
+  summarise(pNA=sum(missing==1)/n()*100)
+head(p_NA)
+```
+
+```{r}
+tot_t <- p_NA %>%
+  group_by(id, visit) %>%
+  summarise(N_t=length(stim))
+
+to_excl <- p_NA %>%
+  filter(pNA>75) %>%
+  distinct(id, visit, stim, cond, trial, pNA) 
+head(to_excl)
+```
+
+## Some participants completely excluded?
+
+```{r}
+to_excl %>%
+  group_by(id, visit) %>%
+  summarise(N_excl=n()) %>%
+  inner_join(tot_t, by=c("id", "visit")) %>%
+  mutate(P_excl=N_excl/N_t*100) %>%
+  filter(P_excl==100) %>%
+  arrange(visit) %>%
+  group_by(visit) %>%
+  summarise(N=n())
+```
+
+```{r}
+pNA.trials.plot.hist <- ggplot(data=p_NA) +
+  geom_histogram(aes(x=reorder(id, visit), y=pNA,
+                   fill=factor(visit)), 
+               stat = "identity",
+               position = "identity") +
+  theme_bw() +
+  theme(axis.text.x = element_blank()) +
+  labs(y="% of Missing Data",
+       x="Participant",
+       fill="visit (months)") +
+  geom_hline(yintercept = 25, col="red", linetype="dashed") +
+  facet_wrap(~stim, nrow = 8)
+# pNA.trials.plot
+# ggsave(pNA.trials.plot, file="Plots/pNA.trials.pdf", height = 15)
+```
+
+```{r}
+save(p_NA, to_excl, not_pres, pNA.trials.plot.hist, file="SavedWS/NA_info.RData")
+```

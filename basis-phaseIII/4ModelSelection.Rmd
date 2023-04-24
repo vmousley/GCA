@@ -1,0 +1,335 @@
+---
+title: "Model Selection"
+author: "Teresa Del Bianco"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include = FALSE}
+# Load packages
+packs <- c("reshape2", "dplyr", "ggplot2", "lmerTest", "broom.mixed", "car", "knitr", "stringi", "tidyr", "sjPlot", "sjlabelled", "sjmisc", "gganimate", "ggpubr")
+lapply(packs, require, character.only = TRUE)
+```
+
+```{r, include=FALSE}
+# Read Data 
+load("SavedWS/data-aggr-0-5.RData")
+```
+
+
+```{r}
+## 75% of the sample size
+smp_size <- floor(0.75 * nrow(data.aggr.0.5.rg.clean))
+
+## set the seed to make your partition reproducible
+set.seed(88)
+train_ind <- sample(seq_len(nrow(data.aggr.0.5.rg.clean)), size = smp_size)
+
+train <- data.aggr.0.5.rg.clean[train_ind, ]
+test <- data.aggr.0.5.rg.clean[-train_ind, ]
+```
+
+# Polynomial order
+
+## Face
+
+### Test Set
+
+```{r}
+m_1 <- lmer(m.plt.face~ot1 #linear
+             + (1+ot1|id),
+             data=train,
+             control=lmerControl(calc.derivs = FALSE))
+m_2 <- lmer(m.plt.face~ot1+ot2 #quadratic
+             + (1+ot1+ot2|id),
+             data=train,
+             control=lmerControl(calc.derivs = FALSE))
+m_3 <- lmer(m.plt.face~ot1+ot2+ot3 #cubic
+             + (1+ot1+ot2+ot3|id),
+             data=train,
+             control=lmerControl(calc.derivs = FALSE))
+```
+
+```{r, include=FALSE}
+m.anv <- anova(m_1
+               , m_2
+               , m_3
+               )
+m.anv <- m.anv %>%
+  tidy() %>% 
+  mutate(Sign=ifelse(p.value<0.001, "**", 
+                     ifelse(p.value<0.05, "*",
+                            ifelse(p.value < 0.1, ".", "-")))) %>%
+  mutate_each(funs(round(.,3)), -term, -Sign)
+m.anv
+```
+
+```{r}
+library(merTools)
+train.mse <- rbind(RMSE=RMSE.merMod(m_1),
+RMSE.merMod(m_2),
+RMSE.merMod(m_3))
+```
+
+```{r}
+m_3_t <- lmer(m.plt.face~ot1+ot2+ot3 
+             + (1+ot1+ot2+ot3|id),
+             data=test,
+             control=lmerControl(calc.derivs = FALSE))
+```
+
+```{r}
+test_mse <- RMSE.merMod(m_3_t)
+```
+
+
+```{r}
+m_3_t <- lmer(m.plt.face~(ot1+ot2+ot3) 
+             + (1+ot1+ot2+ot3|id) +
+               (1|item),
+             data=data.aggr.0.5.rg.clean,
+             control=lmerControl(calc.derivs = FALSE))
+m_3_t_a <- lmer(m.plt.face~(ot1+ot2+ot3)*age 
+             + (1+ot1+ot2+ot3|id) +
+               (1|item),
+             data=data.aggr.0.5.rg.clean,
+             control=lmerControl(calc.derivs = FALSE))
+```
+
+```{r, include=FALSE}
+m.anv.age <- anova(m_3_t, m_3_t_a)
+m.anv.age <- m.anv.age %>%
+  tidy() %>% 
+  mutate(Sign=ifelse(p.value<0.001, "**", 
+                     ifelse(p.value<0.05, "*",
+                            ifelse(p.value < 0.1, ".", "-")))) %>%
+  mutate_each(funs(round(.,3)), -term, -Sign)
+m.anv.age
+```
+
+# Test model with gender as covariate
+
+```{r}
+m_3_t_a_s <- lmer(m.plt.face~(ot1+ot2+ot3)*age
+             + (1+ot1+ot2+ot3|id) +
+               (1|item),
+             data=data.aggr.0.5.rg.clean,
+             control=lmerControl(calc.derivs = FALSE))
+m_3_t_a_sex <- lmer(m.plt.face~(ot1+ot2+ot3)*age + sex
+             + (1+ot1+ot2+ot3|id) +
+               (1|item),
+             data=data.aggr.0.5.rg.clean,
+             control=lmerControl(calc.derivs = FALSE))
+m_3_t_a_sex_int <- lmer(m.plt.face~(ot1+ot2+ot3)*age*sex
+             + (1+ot1+ot2+ot3|id) +
+               (1|item),
+             data=data.aggr.0.5.rg.clean,
+             control=lmerControl(calc.derivs = FALSE))
+```
+
+```{r, include=FALSE}
+m.anv.sex <- anova(m_3_t_a_s, m_3_t_a_sex, m_3_t_a_sex_int)
+m.anv.sex <- m.anv.age %>%
+  tidy() %>% 
+  mutate(Sign=ifelse(p.value<0.001, "**", 
+                     ifelse(p.value<0.05, "*",
+                            ifelse(p.value < 0.1, ".", "-")))) %>%
+  mutate_each(funs(round(.,3)), -term, -Sign)
+m.anv.sex
+```
+
+# With risk group
+
+```{r}
+data.aggr.0.5.rg.clean$LH <- ifelse(data.aggr.0.5.rg.clean$ASD=="1" & data.aggr.0.5.rg.clean$ADHD=="0", "ASD", 
+                                             ifelse(data.aggr.0.5.rg.clean$ASD=="0" & data.aggr.0.5.rg.clean$ADHD=="1", "ADHD",
+                                                    ifelse(data.aggr.0.5.rg.clean$ASD=="1" & data.aggr.0.5.rg.clean$ADHD=="1", "ASD&ADHD",
+                                                           "NULL")))
+data.aggr.0.5.rg.clean$LH <- factor(data.aggr.0.5.rg.clean$LH, levels=c("NULL", "ASD", "ADHD", "ASD&ADHD"))
+unique(data.aggr.0.5.rg.clean$LH)
+```
+
+
+```{r}
+m_3_t_a_comp <- lmer(m.plt.face~(ot1+ot2+ot3)*age*sex 
+             + (1+ot1+ot2+ot3|id) +
+               (1|item),
+             data=data.aggr.0.5.rg.clean,
+             control=lmerControl(calc.derivs = FALSE))
+m_3_t_a_rg1_comp <- lmer(m.plt.face~(ot1+ot2+ot3)*age*sex+ASD 
+             + (1+ot1+ot2+ot3|id) +
+               (1|item),
+             data=data.aggr.0.5.rg.clean,
+             control=lmerControl(calc.derivs = FALSE))
+m_3_t_a_rg2_comp <- lmer(m.plt.face~(ot1+ot2+ot3)*age*sex*ASD 
+             + (1+ot1+ot2+ot3|id) +
+               (1|item),
+             data=data.aggr.0.5.rg.clean,
+             control=lmerControl(calc.derivs = FALSE))
+```
+
+```{r, include=FALSE}
+m.anv.rg <- anova(m_3_t_a_comp,
+                  m_3_t_a_rg1_comp,
+                  m_3_t_a_rg2_comp
+                  )
+
+m.anv.rg.tidy <- m.anv.rg %>%
+  tidy() %>% 
+  mutate(Sign=ifelse(p.value<0.001, "**", 
+                     ifelse(p.value<0.05, "*",
+                            ifelse(p.value < 0.1, ".", "-")))) %>%
+  mutate_each(funs(round(.,3)), -term, -Sign)
+m.anv.rg.tidy
+```
+
+```{r}
+m_3_t_a_rg3_comp <- lmer(m.plt.face~(ot1+ot2+ot3)*age*sex*ASD+ADHD
+             + (1+ot1+ot2+ot3|id) +
+               (1|item),
+             data=data.aggr.0.5.rg.clean,
+             control=lmerControl(calc.derivs = FALSE))
+```
+
+```{r, include=FALSE}
+m.anv.rg.full <- anova(m_3_t_a_rg2_comp, 
+                       m_3_t_a_rg3_comp
+                  )
+
+m.anv.rg.full.tidy <- m.anv.rg.full %>%
+  tidy() %>%
+  mutate(Sign=ifelse(p.value<0.001, "**",
+                     ifelse(p.value<0.05, "*",
+                            ifelse(p.value < 0.1, ".", "-")))) %>%
+  mutate_each(funs(round(.,3)), -term, -Sign)
+m.anv.rg.full.tidy
+```
+
+# Car
+
+```{r}
+mc_1 <- lmer(m.plt.car~(ot1) 
+             + (1+ot1|id) +
+               (1|item),
+             data=train,
+             control=lmerControl(calc.derivs = FALSE))
+mc_2 <- lmer(m.plt.car~(ot1+ot2) 
+             + (1+ot1+ot2|id) +
+               (1|item),
+             data=train,
+             control=lmerControl(calc.derivs = FALSE))
+mc_3 <- lmer(m.plt.car~(ot1+ot2+ot3)*age 
+             + (1+ot1+ot2+ot3|id) +
+               (1|item),
+             data=train,
+             control=lmerControl(calc.derivs = FALSE))
+```
+
+```{r, include=FALSE}
+mc.anv <- anova(mc_1,
+               mc_2,
+               mc_3
+               )
+mc.anv.tidy <- mc.anv %>%
+  tidy() %>% 
+  mutate(Sign=ifelse(p.value<0.001, "**", 
+                     ifelse(p.value<0.05, "*",
+                            ifelse(p.value < 0.1, ".", "-")))) %>%
+  mutate_each(funs(round(.,3)), -term, -Sign)
+mc.anv.tidy
+```
+
+```{r}
+c_rsme_train <- rbind(RMSE.merMod(mc_1),
+RMSE.merMod(mc_2),
+RMSE.merMod(mc_3))
+c_rsme_train
+```
+
+```{r}
+mc_3_t <- lmer(m.plt.car~(ot1+ot2+ot3) 
+             + (1+ot1+ot2+ot3|id) +
+               (1|item),
+             data=test,
+             control=lmerControl(calc.derivs = FALSE))
+```
+
+```{r}
+c_rsme_test <- RMSE.merMod(mc_3_t)
+c_rsme_test
+```
+
+```{r}
+mc_3_it <- lmer(m.plt.car~(ot1+ot2+ot3)
+             + (1+ot1+ot2+ot3|id) +
+               (1|item),
+             data=data.aggr.0.5.rg.clean,
+             control=lmerControl(calc.derivs = FALSE))
+mc_3_t_a <- lmer(m.plt.car~(ot1+ot2+ot3)*age 
+             + (1+ot1+ot2+ot3|id) +
+               (1|item),
+             data=data.aggr.0.5.rg.clean,
+             control=lmerControl(calc.derivs = FALSE))
+```
+
+```{r, include=FALSE}
+mc.anv.age <- anova(mc_3_it,
+               mc_3_t_a
+               )
+mc.anv.age.tidy <- mc.anv.age %>%
+  tidy() %>% 
+  mutate(Sign=ifelse(p.value<0.001, "**", 
+                     ifelse(p.value<0.05, "*",
+                            ifelse(p.value < 0.1, ".", "-")))) %>%
+  mutate_each(funs(round(.,3)), -term, -Sign)
+mc.anv.age.tidy
+```
+
+```{r}
+mc_3_t_a_comp <- lmer(m.plt.car~(ot1+ot2+ot3)*age 
+             + (1+ot1+ot2+ot3|id) +
+               (1|item),
+             data=data.aggr.0.5.rg.clean,
+             control=lmerControl(calc.derivs = FALSE))
+mc_3_t_a_rg1_comp <- lmer(m.plt.car~(ot1+ot2+ot3)*age+ASD 
+             + (1+ot1+ot2+ot3|id) +
+               (1|item),
+             data=data.aggr.0.5.rg.clean,
+             control=lmerControl(calc.derivs = FALSE))
+mc_3_t_a_rg2_comp <- lmer(m.plt.car~(ot1+ot2+ot3)*age*ASD 
+             + (1+ot1+ot2+ot3|id) +
+               (1|item),
+             data=data.aggr.0.5.rg.clean,
+             control=lmerControl(calc.derivs = FALSE))
+```
+
+```{r, include=FALSE}
+mc.anv.rg <- anova(mc_3_t_a_comp,
+               mc_3_t_a_rg1_comp,
+               mc_3_t_a_rg2_comp
+               )
+mc.anv.rg.tidy <- mc.anv.rg %>%
+  tidy() %>% 
+  mutate(Sign=ifelse(p.value<0.001, "**", 
+                     ifelse(p.value<0.05, "*",
+                            ifelse(p.value < 0.1, ".", "-")))) %>%
+  mutate_each(funs(round(.,3)), -term, -Sign)
+mc.anv.rg.tidy
+```
+
+```{r}
+save(data.aggr.0.5.rg.clean,
+     m_3_t_a, m.anv.age, train.mse, test_mse,
+     m_3_t_a_sex_int, m.anv.sex,
+     m_3_t_a_rg2_comp, m.anv.rg.tidy, 
+     m_3_t_a_rg3_comp, m.anv.rg.full.tidy,
+     mc.anv.rg.tidy,
+     c_rsme_train, c_rsme_test, mc.anv.age.tidy, mc.anv.rg.tidy, 
+     mc_3_t_a,  mc_3_t_a_rg2_comp,
+     file="SavedWS/sel-model.RData")
+```
+

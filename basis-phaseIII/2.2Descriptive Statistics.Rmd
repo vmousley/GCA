@@ -1,0 +1,335 @@
+---
+title: "Descriptive Statistics"
+author: "Teresa Del Bianco"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include = FALSE}
+# Load packages
+packs <- c("reshape2", "dplyr", "ggplot2", "lmerTest", "broom.mixed", "car", "knitr", "stringi", "tidyr", "sjPlot", "sjlabelled", "sjmisc", "gganimate", "ggpubr")
+lapply(packs, require, character.only = TRUE)
+```
+
+```{r, include=FALSE}
+# Read Data 
+load("SavedWS/data-aggr-0-5.RData")
+```
+
+# Descriptive Statistics
+
+```{r, include=FALSE}
+females <- data.frame(data.aggr.0.5.rg.clean) %>%
+  filter(sex=="F") %>%
+  dplyr::select(id) %>%
+  unique()
+females <- females$id
+
+descr.means <- data.aggr.0.5.rg.clean %>%
+  group_by(age) %>%
+  summarise(N=length(unique(id)),
+            N_fem=length(which(unique(id) %in% females)),
+            # m.age=round(mean(t1_ageyrs), 2),
+            # min.age=round(min(t1_ageyrs), 2),
+            # max.age=round(max(t1_ageyrs), 2),
+            # m.IQ=round(mean(t1_fsiq, na.rm=T), 2),
+            # min.IQ=round(min(t1_fsiq, na.rm=T), 2),
+            # max.IQ=round(max(t1_fsiq, na.rm=T), 2),
+            m.plt.car=round(mean(m.plt.car, na.rm=T), 2),
+            m.plt.bird=round(mean(m.plt.bird, na.rm=T), 2),
+            m.plt.face=round(mean(m.plt.face, na.rm=T), 2),
+            m.plt.noise=round(mean(m.plt.noise, na.rm=T), 2),
+            m.plt.phone=round(mean(m.plt.phone, na.rm=T), 2))
+descr.sd <- data.aggr.0.5.rg.clean %>%
+  group_by(age) %>%
+  summarise(N=length(unique(id)),
+            N_fem=length(which(unique(id) %in% females)),
+            # s.age=round(sd(t1_ageyrs), 2),
+            # min.age=round(min(t1_ageyrs), 2),
+            # max.age=round(max(t1_ageyrs), 2),
+            # s.IQ=round(sd(t1_fsiq, na.rm=T), 2),
+            # min.IQ=round(min(t1_fsiq, na.rm=T), 2),
+            # max.IQ=round(max(t1_fsiq, na.rm=T), 2),
+            s.plt.car=round(sd(m.plt.car, na.rm=T), 2),
+            s.plt.bird=round(sd(m.plt.bird, na.rm=T), 2),
+            s.plt.face=round(sd(m.plt.face, na.rm=T), 2),
+            s.plt.noise=round(sd(m.plt.noise, na.rm=T), 2),
+            s.plt.phone=round(sd(m.plt.phone, na.rm=T), 2))
+descr <- inner_join(descr.means, descr.sd, by=c("age", "N", "N_fem"))
+descr %>% dplyr::select(age, N_fem, N)
+```
+
+```{r}
+length(unique(data.aggr.0.5.rg.clean$id))
+```
+
+Risk Group
+
+```{r}
+data.aggr.0.5.rg.clean %>%
+  as.data.frame() %>%
+  distinct(id, age, ASD, ADHD) %>%
+  group_by(age) %>%
+  summarise(N=n(),
+            N.HL.ASD=sum(ASD=="1" & ADHD=="0", na.rm=TRUE),
+            N.HL.ADHD=sum(ASD=="0" & ADHD=="1", na.rm=TRUE),
+            N.HL.ASD.ADHD=sum(ASD=="1" & ADHD=="1", na.rm=TRUE),
+            N.LL=sum(ASD=="0" & ADHD=="0", na.rm=TRUE))
+
+```
+
+
+```{r}
+data.aggr.0.5.rg.clean %>%
+  group_by(id) %>%
+  summarise(g=length(unique(as.factor(age)))) %>%
+  group_by(g) %>%
+  summarise(n())
+```
+
+
+# Boxplots
+
+```{r}
+car <- data.aggr.0.5.rg.clean %>%
+  group_by(id, age) %>%
+  summarise(m.plt.car=mean(m.plt.car, na.rm=TRUE)) %>%
+  ggplot() +
+  geom_boxplot(aes(y=m.plt.car,
+             x=as.factor(age),
+             fill=as.factor(age))) +
+  labs(y="Average Proportional LT",
+       x="Age (months)",
+       fill="Age (months)",
+       title="AOI: CAR") +
+  theme_bw()
+```
+```{r}
+bird <- data.aggr.0.5.rg.clean %>%
+  group_by(id, age) %>%
+  summarise(m.plt.bird=mean(m.plt.bird, na.rm=TRUE)) %>%
+  ggplot() +
+  geom_boxplot(aes(y=m.plt.bird,
+             x=as.factor(age),
+             fill=as.factor(age))) +
+  labs(y="Average Proportional LT",
+       x="Age (months)",
+       fill="Age (months)",
+       title="AOI: BIRD") +
+  theme_bw()
+```
+```{r}
+face <- data.aggr.0.5.rg.clean %>%
+  group_by(id, age) %>%
+  summarise(m.plt.face=mean(m.plt.face, na.rm=TRUE)) %>%
+  ggplot() +
+  geom_boxplot(aes(y=m.plt.face,
+             x=as.factor(age),
+             fill=as.factor(age))) +
+  labs(y="Average Proportional LT",
+       x="Age (months)",
+       fill="Age (months)",
+       title="AOI: FACE") +
+  theme_bw()
+```
+```{r}
+noise <- data.aggr.0.5.rg.clean %>%
+  group_by(id, age) %>%
+  summarise(m.plt.noise=mean(m.plt.noise, na.rm=TRUE)) %>%
+  ggplot() +
+  geom_boxplot(aes(y=m.plt.noise,
+             x=as.factor(age),
+             fill=as.factor(age))) +
+  labs(y="Average Proportional LT",
+       x="Age (months)",
+       fill="Age (months)",
+       title="AOI: NOISE") +
+  theme_bw()
+```
+```{r}
+phone <- data.aggr.0.5.rg.clean %>%
+  group_by(id, age) %>%
+  summarise(m.plt.phone=mean(m.plt.phone, na.rm=TRUE)) %>%
+  ggplot() +
+  geom_boxplot(aes(y=m.plt.phone,
+             x=as.factor(age),
+             fill=as.factor(age))) +
+  labs(y="Average Proportional LT",
+       x="Age (months)",
+       fill="Age (months)",
+       title="AOI: PHONE") +
+  theme_bw()
+```
+```{r}
+library(ggpubr)
+all.avg.plt <- ggarrange(car, bird,
+          face, noise,
+          phone,
+          ncol=2,
+          nrow=3,
+          common.legend = TRUE)
+# ggsave(all.avg.plt, file="Plots/all-avg-plt.pdf", width = 10, height = 8.5)
+```
+
+
+# Line Plots
+
+```{r}
+s <- data.aggr.0.5.rg.clean %>%
+  group_by(age) %>%
+  summarise(
+            # av.plt.car=mean(m.plt.car, na.rm=TRUE),
+            car=sd(m.plt.car, na.rm=TRUE),
+            # av.plt.bird=mean(m.plt.bird, na.rm=TRUE),
+            bird=sd(m.plt.bird, na.rm=TRUE),
+            # av.plt.face=mean(m.plt.face, na.rm=TRUE),
+            face=sd(m.plt.face, na.rm=TRUE),
+            # av.plt.noise=mean(m.plt.noise, na.rm=TRUE),
+            noise=sd(m.plt.noise, na.rm=TRUE),
+            # av.plt.phone=mean(m.plt.phone, na.rm=TRUE)
+            phone=sd(m.plt.phone, na.rm=TRUE)
+            ) %>%
+  melt(# ID variables - all the variables to keep but not split apart on
+    id.vars=c("age"),
+        # The source columns
+    # measure.vars=c(),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+    variable.name="AOI",
+    value.name="SD"
+)
+
+
+line_plot <- data.aggr.0.5.rg.clean %>%
+  group_by(age) %>%
+  summarise(car=mean(m.plt.car, na.rm=TRUE),
+            # d.plt.car=sd(m.plt.car, na.rm=TRUE),
+            bird=mean(m.plt.bird, na.rm=TRUE),
+            # d.plt.bird=sd(m.plt.bird, na.rm=TRUE),
+            face=mean(m.plt.face, na.rm=TRUE),
+            # d.plt.face=sd(m.plt.face, na.rm=TRUE),
+            noise=mean(m.plt.noise, na.rm=TRUE),
+            # d.plt.noise=sd(m.plt.noise, na.rm=TRUE),
+            phone=mean(m.plt.phone, na.rm=TRUE)
+            # , d.plt.phone=sd(m.plt.phone, na.rm=TRUE)
+            ) %>%
+  melt(# ID variables - all the variables to keep but not split apart on
+    id.vars=c("age"),
+        # The source columns
+    # measure.vars=c(),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+    variable.name="AOI",
+    value.name="M"
+) %>%
+  inner_join(s, by=c("age", "AOI")) %>%
+  ggplot() +
+  geom_errorbar(aes(ymin=M-SD,
+                  ymax=M+SD,
+                  x=age,
+                  col=AOI),
+                position = position_dodge(0.5)) +
+  geom_line(aes(y=M,
+             x=age,
+             col=AOI), 
+            position = position_dodge(0.5)) +
+  geom_point(aes(y=M,
+             x=age,
+             fill=AOI),
+             shape=23,
+             size=3,
+             position = position_dodge(0.5)) +
+  scale_x_continuous(breaks = c(5,10,14,24,36)) +
+  labs(y="Average Proportional LT",
+       x="Age (months)") +
+  theme_bw()
+ggsave(filename = "Plots/line_plot.pdf", plot = line_plot)
+```
+
+# TS Plots
+
+```{r}
+ts.car <- data.aggr.0.5.rg.clean %>%
+  ggplot(aes(x=block.05/4, y=m.plt.car, fill=as.factor(age))) + 
+  stat_summary(fun.data = "mean_ci", geom="ribbon", alpha=0.2) + 
+  stat_summary(aes(col=as.factor(age)), fun.y = "mean", geom="path") + 
+  stat_summary(aes(col=as.factor(age)), fun.y = "mean", geom="point") +
+  theme_bw() +
+  labs(y="Proportional Looking Time",
+       x="Time (s)",
+       col="Age (months)",
+       fill="Age (months)",
+       title="AOI: CAR")
+```
+```{r}
+ts.bird <- data.aggr.0.5.rg.clean %>%
+  ggplot(aes(x=block.05/4, y=m.plt.bird, fill=as.factor(age))) + 
+  stat_summary(fun.data = "mean_ci", geom="ribbon", alpha=0.2) + 
+  stat_summary(aes(col=as.factor(age)), fun.y = "mean", geom="path") + 
+  stat_summary(aes(col=as.factor(age)), fun.y = "mean", geom="point") +
+  theme_bw() +
+  labs(y="Proportional Looking Time",
+       x="Time (s)",
+       col="Age (months)",
+       fill="Age (months)",
+       title="AOI: BIRD") 
+```
+```{r}
+ts.face <- data.aggr.0.5.rg.clean %>%
+  ggplot(aes(x=block.05/4, y=m.plt.face, fill=as.factor(age))) + 
+  stat_summary(fun.data = "mean_ci", geom="ribbon", alpha=0.2) + 
+  stat_summary(aes(col=as.factor(age)), fun.y = "mean", geom="path") + 
+  stat_summary(aes(col=as.factor(age)), fun.y = "mean", geom="point") +
+  theme_bw() +
+  labs(y="Proportional Looking Time",
+       x="Time (s)",
+       col="Age (months)",
+       fill="Age (months)",
+       title="AOI: FACE") 
+```
+```{r}
+ts.noise <- data.aggr.0.5.rg.clean %>%
+  ggplot(aes(x=block.05/4, y=m.plt.noise, fill=as.factor(age))) + 
+  stat_summary(fun.data = "mean_ci", geom="ribbon", alpha=0.2) + 
+  stat_summary(aes(col=as.factor(age)), fun.y = "mean", geom="path") + 
+  stat_summary(aes(col=as.factor(age)), fun.y = "mean", geom="point") +
+  theme_bw() +
+  labs(y="Proportional Looking Time",
+       x="Time (s)",
+       col="Age (months)",
+       fill="Age (months)",
+       title="AOI: NOISE") 
+```
+```{r}
+ts.phone <- data.aggr.0.5.rg.clean %>%
+  ggplot(aes(x=block.05/4, y=m.plt.phone, fill=as.factor(age))) + 
+  stat_summary(fun.data = "mean_ci", geom="ribbon", alpha=0.2) + 
+  stat_summary(aes(col=as.factor(age)), fun.y = "mean", geom="path") + 
+  stat_summary(aes(col=as.factor(age)), fun.y = "mean", geom="point") +
+  theme_bw() +
+  labs(y="Proportional Looking Time",
+       x="Time (s)",
+       col="Age (months)",
+       fill="Age (months)",
+       title="AOI: PHONE") 
+```
+
+```{r}
+all.ts.plt <- ggarrange(ts.car, ts.bird,
+          ts.face, ts.noise,
+          ts.phone,
+          ncol=2,
+          nrow=3,
+          common.legend = TRUE)
+all.ts.plt
+# ggsave(all.ts.plt, file="Plots/all-ts-plt.pdf", width = 10, height = 8.5)
+```
+
+```{r}
+save(all.ts.plt, all.avg.plt, file="SavedWS/raw-plots.RData")
+```
+

@@ -1,0 +1,211 @@
+---
+title: "Data Preparation"
+author: "Teresa Del Bianco"
+date: "`r Sys.Date()`"
+output: html_document
+---
+# Load packages 
+
+```{r, message = FALSE, warning = FALSE, include = FALSE}
+packs <- c("R.matlab", "reshape2", "dplyr", "multidplyr", "ggplot2", "tidyr")
+lapply(packs, require, character.only = TRUE)
+```
+
+# Load data
+
+```{r}
+load("SavedWS/cbfnp.RData")
+```
+
+# Exclude absent data
+
+```{r}
+load("SavedWS/NA_info.RData")
+```
+
+```{r}
+cbfnp.pres <- cbfnp.ph2 %>% anti_join(not_pres, by=c("id", "visit", "time", "cond", "trial"))
+```
+
+# Aggregate data 
+
+## Create time blocks at various frequencies
+
+```{r}
+library(itsadug)
+cbfnp.block <- cbfnp.pres %>%
+  mutate(time.ms=time*1000) %>%
+  mutate(block.0125=timeBins(time.ms, 125, pos = 1)/125,
+         block.025=timeBins(time.ms, 250, pos = 1)/250, 
+         block.05=timeBins(time.ms, 500, pos = 1)/500,
+         block.1=timeBins(time.ms, 1000, pos = 1)/1000,
+         block.15=timeBins(time.ms, 1500, pos = 1)/1500,
+         block.2=timeBins(time.ms, 2000, pos = 1)/2000)
+```
+
+## Cut first half second and last second 
+
+```{r}
+# unique(cbfnp.block$block.1)/4
+cbfnp.block.cut <- filter(cbfnp.block, block.05>1 & block.05<21)
+# unique(cbfnp.block.cut$block.05)/4
+cbfnp.block.cut$block.05 <- cbfnp.block.cut$block.05 - 1
+```
+
+```{r}
+save(cbfnp.block, cbfnp.block.cut, file = "SavedWS/cbfnp-block.RData")
+```
+
+#### Create the dataset with 0.5 s time-bins
+
+```{r}
+data.aggr.1 <- cbfnp.block.cut %>%  
+  group_by(id, visit,
+           cond, trial,
+           block.1) %>%
+  summarise(n.nm.car=length(!is.na(plt.car)),
+            m.plt.car=mean(plt.car, na.rm=T),
+            v.plt.car=var(plt.car, na.rm=T),
+            n.nm.bird=length(!is.na(plt.bird)),
+            m.plt.bird=mean(plt.bird, na.rm=T),
+            v.plt.bird=var(plt.bird, na.rm=T),
+            n.nm.face=length(!is.na(plt.face)),
+            m.plt.face=mean(plt.face, na.rm=T),
+            v.plt.face=var(plt.face, na.rm=T),
+            n.nm.noise=length(!is.na(plt.noise)),
+            m.plt.noise=mean(plt.noise, na.rm=T),
+            v.plt.noise=var(plt.noise, na.rm=T),
+            n.nm.phone=length(!is.na(plt.phone)),
+            m.plt.phone=mean(plt.phone, na.rm=T),
+            v.plt.phone=var(plt.phone, na.rm=T)) %>%
+  collect()
+head(data.aggr.1)
+```
+
+##### Add polynomials
+
+```{r}
+t <- poly((unique(data.aggr.1$block.1)), 3)
+data.aggr.1[,paste("ot", 1:3, sep="")] <- t[data.aggr.1$block.1, 1:3]
+# data.aggr.1 <- data.aggr.1 %>%
+#   mutate(ot1=block.1*t[1],
+#          ot2=block.1*t[2],
+#          ot3=block.1*t[3],
+#          ot4=block.1*t[4])
+```
+
+```{r}
+data.aggr.1 %>%
+  distinct(id, visit) %>%
+  group_by(visit) %>%
+  summarise(N=length(unique(id))) #ok
+```
+
+# Exclude missing data
+
+```{r}
+data.aggr.1.clean <- data.aggr.1 %>% 
+  anti_join(to_excl, by=c("id", "visit", "cond", "trial"))
+head(data.aggr.1.clean)
+```
+```{r}
+data.aggr.1.clean <- inner_join(data.aggr.1.clean, p_NA, by=c("id", "visit", "cond", "trial"))
+```
+
+```{r}
+length(unique(data.aggr.1.clean$id))
+```
+
+```{r}
+write.table(x = data.aggr.1, file = "Datasets/all-data-0.5-sec.csv", row.names = FALSE, sep = ";")
+```
+
+```{r}
+write.table(x = data.aggr.1.clean, file = "Datasets/clean-data-0.5-sec.csv", row.names = FALSE, sep = ";")
+```
+
+# Examine trials with no looking at AOIs
+
+```{r}
+nL.trials <- data.aggr.1.clean %>%
+  group_by(id, visit, cond, trial) %>%
+  summarise(tot.samples=sum(n.nm.car),
+            nonL.samples=sum(m.plt.car==0 &
+                               m.plt.bird==0 &
+                               m.plt.face==0 &
+                               m.plt.noise==0 &
+                               m.plt.phone==0),
+            perc.mL=round(nonL.samples/tot.samples*100, 2)) %>%
+  arrange(id, visit)
+```
+
+```{r}
+nL.trials.plot <- nL.trials %>%
+  group_by(id, visit) %>%
+  summarise(perc.mL=mean(perc.mL, na.rm=TRUE)) %>%
+  ggplot() +
+  geom_histogram(aes(x=reorder(id, visit), y=perc.mL,
+                   fill=factor(visit)), 
+               color="black",
+               stat = "identity",
+               position = "identity") +
+  theme_bw() +
+  ylim(0,10) + 
+  theme(axis.text.x = element_blank()) +
+  labs(y="% of Non-looking Trials",
+       x="Participant",
+       fill="Visit") 
+# ggsave(nL.trials.plot, filename = "Plots/nL-trials-plot.pdf", width = 12)
+```
+
+# Counting how many AOI are sampled
+
+```{r}
+data.AOI.s <- cbfnp.block.cut %>%  
+  group_by(id, visit, cond, trial) %>%
+  mutate(un.fix.car=c(0, diff(plt.car)>0),
+         un.fix.bird=c(0, diff(plt.bird)>0),
+         un.fix.face=c(0, diff(plt.face)>0),
+         un.fix.noise=c(0, diff(plt.noise)>0),
+         un.fix.phone=c(0, diff(plt.phone)>0)) %>%
+  group_by(id, visit, block.2) %>%
+  summarise(n.aoi.s.car = sum(un.fix.car, na.rm=T),
+            n.aoi.s.bird = sum(un.fix.bird, na.rm=T),
+            n.aoi.s.face = sum(un.fix.face, na.rm=T),
+            n.aoi.s.noise = sum(un.fix.noise, na.rm=T),
+            n.aoi.s.phone = sum(un.fix.phone, na.rm=T)) %>%
+  mutate(n.aoi.s.any = n.aoi.s.car+n.aoi.s.bird+
+         n.aoi.s.face+n.aoi.s.noise+
+         n.aoi.s.phone)
+head(data.AOI.s)
+```
+
+And plot: 
+  
+```{r}
+# compute lower and upper whiskers
+n.fix.aois.boxplot <- ggplot(data.AOI.s,
+                             aes(x = (block.2-1)*2, 
+                                 y = n.aoi.s.any,
+                                 color=as.factor(visit),
+                                 fill=as.factor(visit),
+                                 group=as.factor(visit))) +
+  stat_summary(fun.data = mean_se, geom = "ribbon", 
+               alpha=0.3, color=NA) +
+  
+  stat_summary(fun.y=mean, geom="line", size=1.5) + 
+  stat_summary(fun.y=mean, geom="point", size=2, shape=21, color="black") +
+  labs(y = "Average N of Visits to any AOI",
+       x = "Time (s)",
+       color = "Visit",
+       fill="Visit") +
+  theme_bw() +
+  ylim(0,12)
+
+# ggsave(n.fix.aois.boxplot, file="Plots/n-fix-aois-plot.pdf", width=12, height = 9)
+```
+
+```{r}
+save(data.aggr.1, data.aggr.1.clean, nL.trials, data.AOI.s, file = "SavedWS/data-aggr-1.RData")
+```
+

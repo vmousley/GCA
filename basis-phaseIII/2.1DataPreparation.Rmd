@@ -1,0 +1,233 @@
+---
+title: "Data Preparation"
+author: "Teresa Del Bianco"
+date: "`r Sys.Date()`"
+output: html_document
+---
+# Load packages 
+
+```{r, message = FALSE, warning = FALSE, include = FALSE}
+packs <- c("R.matlab", "reshape2", "dplyr", "multidplyr", "ggplot2", "tidyr")
+lapply(packs, require, character.only = TRUE)
+```
+
+# Load data
+
+```{r}
+load("SavedWS/cbfnp.RData")
+```
+
+# Exclude absent data
+
+```{r}
+load("SavedWS/NA_info.RData")
+```
+
+```{r}
+cbfnp.pres <- cbfnp.ph3 %>% anti_join(not_pres, by=c("id", "group", "age", "time", "trial", "item"))
+```
+
+```{r}
+nrow(cbfnp)-nrow(cbfnp.pres)
+```
+
+# Aggregate data 
+
+## Create time blocks at various frequencies
+
+```{r}
+library(itsadug)
+cbfnp.block <- cbfnp.pres %>%
+  mutate(time.ms=time*1000) %>%
+  mutate(block.0125=timeBins(time.ms, 125, pos = 1)/125,
+         block.025=timeBins(time.ms, 250, pos = 1)/250, 
+         block.05=timeBins(time.ms, 500, pos = 1)/500,
+         block.1=timeBins(time.ms, 1000, pos = 1)/1000,
+         block.15=timeBins(time.ms, 1500, pos = 1)/1500,
+         block.2=timeBins(time.ms, 2000, pos = 1)/2000)
+```
+
+## Cut first half second and last second 
+
+```{r}
+unique(cbfnp.block$block.05)/4
+cbfnp.block.cut <- filter(cbfnp.block, block.05>1 & block.05<21)
+unique(cbfnp.block.cut$block.05)/4
+cbfnp.block.cut$block.05 <- cbfnp.block.cut$block.05 - 1
+```
+
+```{r}
+save(cbfnp.block, cbfnp.block.cut, file = "SavedWS/cbfnp-block.RData")
+```
+
+#### Create the dataset with 0.5 s time-bins
+
+```{r}
+data.aggr.0.5 <- cbfnp.block.cut %>%  
+  group_by(id, age,
+           group, item,
+           ASD, ADHD,
+           block.05) %>%
+  summarise(n.nm.car=length(!is.na(plt.car)),
+            m.plt.car=mean(plt.car, na.rm=T),
+            n.nm.bird=length(!is.na(plt.bird)),
+            m.plt.bird=mean(plt.bird, na.rm=T),
+            n.nm.face=length(!is.na(plt.face)),
+            m.plt.face=mean(plt.face, na.rm=T),
+            n.nm.noise=length(!is.na(plt.noise)),
+            m.plt.noise=mean(plt.noise, na.rm=T),
+            n.nm.phone=length(!is.na(plt.phone)),
+            m.plt.phone=mean(plt.phone, na.rm=T)) %>%
+  collect()
+head(data.aggr.0.5)
+```
+
+##### Add polynomials
+
+```{r}
+t <- poly((unique(data.aggr.0.5$block.05)), 3)
+data.aggr.0.5[,paste("ot", 1:3, sep="")] <- t[data.aggr.0.5$block.05, 1:3]
+# data.aggr.0.5 <- data.aggr.0.5 %>%
+#   mutate(ot1=block.05*t[1],
+#          ot2=block.05*t[2],
+#          ot3=block.05*t[3],
+#          ot4=block.05*t[4])
+```
+
+# Exclude "crossed" participants
+
+```{r}
+p_X <- data.aggr.0.5 %>%
+  as.data.frame() %>%
+  distinct(id, group, age, ASD, ADHD) %>%
+  dplyr::select(id, group, age, ASD, ADHD) %>%
+  filter(ASD=="X" | ADHD=="X")
+p_X
+id_x <- unique(p_X[c("id", "age")])
+```
+```{r}
+data.aggr.0.5.rg.fin <- data.aggr.0.5 %>% anti_join(id_x, by=c("id", "age"))
+```
+
+```{r}
+data.aggr.0.5.rg.fin %>%
+  distinct(id, group, age) %>%
+  group_by(age) %>%
+  summarise(N=length(unique(id))) #ok
+```
+
+# Exclude missing data
+
+```{r}
+data.aggr.0.5.rg.clean <- data.aggr.0.5.rg.fin %>% anti_join(to_excl, by=c("id", "group", "age", "item"))
+head(data.aggr.0.5.rg.clean)
+```
+
+```{r}
+length(unique(data.aggr.0.5.rg.fin$id))
+```
+
+```{r}
+write.table(x = data.aggr.0.5, file = "Datasets/all-data-0.5-sec.csv", row.names = FALSE, sep = ";")
+```
+
+```{r}
+write.table(x = data.aggr.0.5.rg.clean, file = "Datasets/clean-data-0.5-sec.csv", row.names = FALSE, sep = ";")
+```
+
+## Add gender information
+
+```{r}
+gd <- read.csv("Datasets/Mullen_phase3.csv")
+gd <- gd %>%
+  distinct(ID, SEX) %>%
+  mutate(ID=paste0("A", ID)) %>%
+  rename(id=ID, sex=SEX)
+data.aggr.0.5.rg.clean <- left_join(data.aggr.0.5.rg.clean, gd, by="id")
+```
+
+# Examine trials with no looking at AOIs
+
+```{r}
+nL.trials <- data.aggr.0.5.rg.clean %>%
+  group_by(id, age, group, item) %>%
+  summarise(tot.samples=sum(n.nm.car),
+            nonL.samples=sum(m.plt.car==0 &
+                               m.plt.bird==0 &
+                               m.plt.face==0 &
+                               m.plt.noise==0 &
+                               m.plt.phone==0),
+            perc.mL=round(nonL.samples/tot.samples*100, 2)) %>%
+  arrange(id, age)
+```
+
+```{r}
+nL.trials.plot <- nL.trials %>%
+  group_by(id, age) %>%
+  summarise(perc.mL=mean(perc.mL, na.rm=TRUE)) %>%
+  ggplot() +
+  geom_histogram(aes(x=reorder(id, age), y=perc.mL,
+                   fill=factor(age)), 
+               color="black",
+               stat = "identity",
+               position = "identity") +
+  theme_bw() +
+  ylim(0,5) + 
+  theme(axis.text.x = element_blank()) +
+  labs(y="% of Non-looking Trials",
+       x="Participant",
+       fill="Age (months)") 
+# ggsave(nL.trials.plot, filename = "Plots/nL-trials-plot.pdf", width = 12)
+```
+
+# Counting how many AOI are sampled
+
+```{r}
+data.AOI.s <- cbfnp.block %>%  
+  group_by(id, age, item) %>%
+  mutate(un.fix.car=c(0, diff(plt.car)>0),
+         un.fix.bird=c(0, diff(plt.bird)>0),
+         un.fix.face=c(0, diff(plt.face)>0),
+         un.fix.noise=c(0, diff(plt.noise)>0),
+         un.fix.phone=c(0, diff(plt.phone)>0)) %>%
+  group_by(id, age, block.2) %>%
+  summarise(n.aoi.s.car = sum(un.fix.car, na.rm=T),
+            n.aoi.s.bird = sum(un.fix.bird, na.rm=T),
+            n.aoi.s.face = sum(un.fix.face, na.rm=T),
+            n.aoi.s.noise = sum(un.fix.noise, na.rm=T),
+            n.aoi.s.phone = sum(un.fix.phone, na.rm=T)) %>%
+  mutate(n.aoi.s.any = n.aoi.s.car+n.aoi.s.bird+
+         n.aoi.s.face+n.aoi.s.noise+
+         n.aoi.s.phone)
+head(data.AOI.s)
+```
+
+And plot: 
+  
+```{r}
+# compute lower and upper whiskers
+n.fix.aois.boxplot <- ggplot(data.AOI.s,
+                             aes(x = (block.2-1)*2, 
+                                 y = n.aoi.s.any,
+                                 color=as.factor(age),
+                                 fill=as.factor(age),
+                                 group=as.factor(age))) +
+  stat_summary(fun.data = mean_se, geom = "ribbon", 
+               alpha=0.3, color=NA) +
+  
+  stat_summary(fun.y=mean, geom="line", size=1.5) + 
+  stat_summary(fun.y=mean, geom="point", size=2, shape=21, color="black") +
+  labs(y = "Average N of Visits to any AOI",
+       x = "Time (s)",
+       color = "Age (months)",
+       fill="Age (months)") +
+  theme_bw() + 
+  scale_x_continuous(breaks=seq(0,10,2))
+
+# ggsave(n.fix.aois.boxplot, file="Plots/n-fix-aois-plot.pdf", width=12, height = 9)
+```
+
+```{r}
+save(data.aggr.0.5, data.aggr.0.5.rg.fin, data.aggr.0.5.rg.clean, nL.trials, id_x, file = "SavedWS/data-aggr-0-5.RData")
+```
+

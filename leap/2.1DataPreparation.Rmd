@@ -1,0 +1,152 @@
+---
+title: "Data Preparation"
+author: "Teresa Del Bianco"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+In this script, we exclude absent and missing data and aggregate the data into 0.5 seconds timebins. We plot how many AOIs are sampled. 
+
+# Load packages 
+
+```{r, message = FALSE, warning = FALSE, include = FALSE}
+packs <- c("R.matlab", "reshape2", "dplyr", "multidplyr", "ggplot2", "tidyr")
+lapply(packs, require, character.only = TRUE)
+```
+
+# Load data
+
+```{r}
+load("Data/SavedWS/pop-out-all-aois-demo-leap.RData")
+```
+
+# Exclude absent data
+
+```{r}
+load("Data/SavedWS/NA_info.RData")
+load("Data/SavedWS/data_miss_abs.RData")
+```
+
+```{r}
+str(cbfnp.demo)
+unique(cbfnp.demo$aoi.name)
+```
+
+```{r}
+not_pres <- not_pres %>%
+  mutate(id=as.character(id))
+cbfnp.pres <- cbfnp.demo %>% 
+  anti_join(not_pres, by=c("id", "tp", "time", "trial", "stim"))
+```
+
+```{r}
+nrow(cbfnp.demo)-nrow(cbfnp.pres)
+```
+
+```{r}
+cbfnp.pres
+```
+# Aggregate data 
+
+## Create time blocks 
+
+```{r}
+library(itsadug)
+cbfnp.block <- cbfnp.pres %>%
+  mutate(block.05=timeBins(time, 0.5, pos = 1))
+data_miss.block <- data_miss_abs %>%
+  dplyr::select(id, time, missing, stim) %>%
+  mutate(block.05=timeBins(time, 0.5, pos = 1))
+```
+
+## Cut last second 
+
+```{r}
+unique(cbfnp.block$block.05)
+cbfnp.block.cut <- filter(cbfnp.block, block.05/2<11.5)
+unique(cbfnp.block.cut$block)
+```
+
+```{r}
+# save(cbfnp.block, cbfnp.block.cut, file = "SavedWS/cbfnp-block.RData")
+```
+
+#### Create the dataset with 1 s time-bins
+
+```{r}
+data.aggr <- cbfnp.block.cut %>%  
+  group_by(id, tp,
+           stim, trial, aoi.name,
+           diagnosis, site, sex, ageyrs,
+           block.05) %>%
+  summarise(m.plt=mean(plt, na.rm=T)) %>%
+  collect() %>%
+  rename(block=block.05)
+head(data.aggr)
+```
+
+```{r}
+data.aggr.na <- data_miss.block %>%  
+  group_by(id, stim, block.05) %>%
+  summarise(pNA=mean(missing)) %>%
+  collect() %>%
+  rename(block=block.05) %>%
+  mutate(id=as.character(id))
+data.aggr.na %>% filter(pNA>0.75)
+```
+```{r}
+data.aggr.ext <- left_join(data.aggr, data.aggr.na, by=c("id", "stim", "block"))
+```
+
+```{r}
+data.aggr %>% group_by(diagnosis) %>% distinct(id) %>% group_by(diagnosis) %>% summarise(n())
+```
+
+##### Add polynomials
+
+```{r}
+e <- unique(data.aggr.ext[c("trial", "block")]) %>% arrange(trial)
+s <- unique(e$trial)
+ep5 <- data.frame()
+for (i in 1:length(s)) {
+  sb = subset(e, trial==s[i])
+  t = poly(sb$block, 3)
+  ep_t = cbind(as.data.frame(seq(from = min(sb$block),
+                                 to = max(sb$block),
+                                 by = min(sb$block))),
+               as.data.frame(t[,]))
+  colnames(ep_t) <- c("block", "ot1", "ot2", "ot3")
+  ep_t$trial = s[i]
+
+  ep5 = rbind(ep5, ep_t)
+}
+```
+```{r}
+data.aggr.ext <- left_join(data.aggr.ext, ep5, by=c("block", "trial"))
+```
+
+# Exclude missing data
+
+```{r}
+data.aggr.clean <- data.aggr.ext %>% filter(pNA<0.75)
+head(data.aggr.clean)
+```
+
+```{r}
+length(unique(data.aggr.clean$id))
+```
+
+```{r}
+write.table(x = data.aggr, file = "Datasets/all-data-0.5-sec.csv", row.names = FALSE, sep = ";")
+```
+
+```{r}
+write.table(x = data.aggr.clean, file = "Datasets/clean-data-0.5-sec.csv", row.names = FALSE, sep = ";")
+```
+
+
+```{r}
+rm(list=setdiff(ls(), ls(pattern = c("data.aggr"))))
+save.image(file = "Data/SavedWS/data-all-aois-model.RData")
+```
+
