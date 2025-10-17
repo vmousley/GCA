@@ -1,0 +1,328 @@
+---
+title: "Plots of Model Fits"
+output: html_notebook
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(dplyr)
+library(ggplot2)
+```
+
+# SSS Plots
+
+```{r}
+load("SavedWS/mod-sel.RData")
+```
+
+## AUT 
+
+### Prediction Intervals
+
+```{r}
+library(merTools)
+asd.data <- subset(data.tb.3, diagnosis == "AUT")
+new.data <- expand.grid(t1_sex=c("Female", "Male"), 
+                        t1_ageyrs=seq(from=round(min(asd.data$t1_ageyrs)),
+                                      to=round(max(asd.data$t1_ageyrs)), 
+                                      by=0.5),
+                        block=unique(asd.data$block),
+                        AOI=unique(asd.data$AOI))
+
+t <- poly(unique(new.data$block), 3)
+new.data[,paste("ot", 1:3, sep="")] <- t[new.data$block, 1:3]
+new.data$id <- 1
+```
+```{r}
+set.seed(88)
+prediction_int_asd <- predictInterval(asd.sex.age.i, 
+                newdata=new.data, 
+                which = "full", #"full", "fixed", "random", "all"
+                level = 0.95, n.sims = 1000, 
+                stat = "mean", #"median", "mean"
+                type = "linear.prediction", #"linear.prediction", "probability"
+                include.resid.var = FALSE, 
+                returnSims = FALSE, 
+                seed = NULL,
+                fix.intercept.variance = FALSE)
+new.data <- cbind(new.data, prediction_int_asd)
+```
+
+```{r}
+new.data.summ <- new.data %>%
+  dplyr::group_by(t1_sex, t1_ageyrs, AOI, block, ot1, ot2, ot3) %>%
+  dplyr::summarise(fit=mean(fit),
+            upr=mean(upr),
+            lwr=mean(lwr)) %>%
+  mutate(age.group=ifelse(t1_ageyrs<14, "6-14", 
+                          ifelse(t1_ageyrs>=14 & t1_ageyrs<18, "14-18",
+                                 ">18")))
+new.data.summ$age.group <- factor(new.data.summ$age.group, levels=c("6-14",
+                                                                    "14-18",
+                                                                    ">18"))
+```
+
+### Plot
+
+```{r}
+plot.fit.asd.face <- ggplot(subset(new.data.summ, AOI=="h.head")) + 
+  geom_path(aes(x=block/2, 
+                y=fit*100, 
+                color=t1_sex, 
+                group=interaction(t1_sex, t1_ageyrs),
+                alpha=t1_ageyrs)) +
+  facet_grid(~AOI, scales = "free_y") + 
+  scale_color_manual(values=c(Female="darkorange1", 
+                              Male="olivedrab4")) +
+  theme_bw() + 
+  labs(y="", 
+       x="", 
+       color="Sex",
+       linetype="Age Group",
+       title="",
+       subtitle="Subset: AUT") +
+  scale_alpha(name="Age",
+              range=c(0.05,1),
+              breaks=c(6,10,14,18,25,30)) +
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5))
+plot.fit.asd.face
+```
+
+## NT 
+
+### Prediction Intervals
+
+```{r}
+library(merTools)
+nt.data <- subset(data.tb.3, diagnosis == "NT")
+new.data <- expand.grid(t1_sex=c("Female", "Male"), 
+                        t1_ageyrs=seq(from=round(min(nt.data$t1_ageyrs)), to=round(max(nt.data$t1_ageyrs)), by=0.5),
+                        block=unique(nt.data$block),
+                        AOI=unique(nt.data$AOI))
+
+t <- poly(unique(new.data$block), 3)
+new.data[,paste("ot", 1:3, sep="")] <- t[new.data$block, 1:3]
+new.data$id <- 1
+```
+```{r}
+set.seed(88)
+prediction_int_nt <- predictInterval(nt.sex.age.i, 
+                newdata=new.data, 
+                which = "full", #"full", "fixed", "random", "all"
+                level = 0.95, n.sims = 1000, 
+                stat = "mean", #"median", "mean"
+                type = "linear.prediction", #"linear.prediction", "probability"
+                include.resid.var = FALSE, 
+                returnSims = FALSE, 
+                seed = NULL,
+                fix.intercept.variance = FALSE)
+new.data <- cbind(new.data, prediction_int_nt)
+```
+
+```{r}
+new.data.summ <- new.data %>%
+  dplyr::group_by(t1_sex, t1_ageyrs, AOI, block, ot1, ot2, ot3) %>%
+  dplyr::summarise(fit=mean(fit),
+            upr=mean(upr),
+            lwr=mean(lwr)) %>%
+  mutate(age.group=ifelse(t1_ageyrs<14, "6-14", 
+                          ifelse(t1_ageyrs>=14 & t1_ageyrs<18, "14-18",
+                                 ">18")))
+new.data.summ$age.group <- factor(new.data.summ$age.group, levels=c("6-14",
+                                                                    "14-18",
+                                                                    ">18"))
+```
+
+### Plot
+
+```{r}
+plot.fit.nt.face <- ggplot(subset(new.data.summ, AOI=="h.head")) + 
+  geom_path(aes(x=block/2, 
+                y=fit*100, 
+                color=t1_sex, 
+                group=interaction(t1_sex, t1_ageyrs),
+                alpha=t1_ageyrs)) +
+  facet_grid(~AOI, scales = "free_y") + 
+  scale_color_manual(values=c(Female="darkorange1", 
+                              Male="olivedrab4")) +
+  theme_bw() + 
+  labs(y="", 
+       x="", 
+       color="Sex",
+       linetype="Age Group",
+       title="",
+       subtitle="Subset: NT") +
+  scale_alpha(name="Age",
+              range=c(0.05,1),
+              breaks=c(6,10,14,18,25,30)) +
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5))
+plot.fit.nt.face
+```
+## Males
+
+```{r}
+library(merTools)
+d.males <- subset(data.tb.3, t1_sex == "Male")
+new.data <- expand.grid(diagnosis=c("NT", "AUT"), 
+                        t1_ageyrs=seq(from=round(min(d.males$t1_ageyrs)), to=round(max(d.males$t1_ageyrs)), by=0.5),
+                        block=unique(d.males$block),
+                        AOI=unique(d.males$AOI))
+
+t <- poly(unique(new.data$block), 3)
+new.data[,paste("ot", 1:3, sep="")] <- t[new.data$block, 1:3]
+new.data$id <- 1
+```
+```{r}
+set.seed(88)
+prediction_int_ma <- predictInterval(male.group.age.i, 
+                newdata=new.data, 
+                which = "full", #"full", "fixed", "random", "all"
+                level = 0.95, n.sims = 1000, 
+                stat = "mean", #"median", "mean"
+                type = "linear.prediction", #"linear.prediction", "probability"
+                include.resid.var = FALSE, 
+                returnSims = FALSE, 
+                seed = NULL,
+                fix.intercept.variance = FALSE)
+new.data <- cbind(new.data, prediction_int_ma)
+```
+
+```{r}
+new.data.summ <- new.data %>%
+  dplyr::group_by(diagnosis, t1_ageyrs, AOI, block, ot1, ot2, ot3) %>%
+  dplyr::summarise(fit=mean(fit),
+            upr=mean(upr),
+            lwr=mean(lwr)) %>%
+  mutate(age.group=ifelse(t1_ageyrs<14, "6-14", 
+                          ifelse(t1_ageyrs>=14 & t1_ageyrs<18, "14-18",
+                                 ">18")))
+new.data.summ$age.group <- factor(new.data.summ$age.group, levels=c("6-14",
+                                                                    "14-18",
+                                                                    ">18"))
+```
+
+```{r}
+plot.fit.mal.face <- ggplot(subset(new.data.summ, AOI=="h.head")) + 
+  geom_path(aes(x=block/2, 
+                y=fit*100, 
+                color=diagnosis, 
+                group=interaction(diagnosis, t1_ageyrs),
+                alpha=t1_ageyrs)) +
+  facet_grid(~AOI, scales = "free_y") + 
+  scale_color_manual(values=c(NT="slateblue1", 
+                              AUT="springgreen3")) +
+  theme_bw() + 
+  labs(y="", 
+       x="", 
+       color="Diagnosis",
+       title="",
+       subtitle="Subset: Males") +
+  scale_alpha(name="Age",
+              range=c(0.05,1),
+              breaks=c(6,10,14,18,25,30)) +
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5))
+plot.fit.mal.face
+```
+
+## Females
+
+```{r}
+library(merTools)
+d.fem <- subset(data.tb.3, t1_sex == "Female")
+new.data <- expand.grid(diagnosis=c("NT", "AUT"), 
+                        t1_ageyrs=seq(from=round(min(d.fem$t1_ageyrs)), to=round(max(d.fem$t1_ageyrs)), by=0.5),
+                        block=unique(d.fem$block),
+                        AOI=unique(d.fem$AOI))
+
+t <- poly(unique(new.data$block), 3)
+new.data[,paste("ot", 1:3, sep="")] <- t[new.data$block, 1:3]
+new.data$id <- 1
+```
+```{r}
+set.seed(88)
+prediction_int_fe <- predictInterval(female.group.age.i, 
+                newdata=new.data, 
+                which = "full", #"full", "fixed", "random", "all"
+                level = 0.95, n.sims = 1000, 
+                stat = "mean", #"median", "mean"
+                type = "linear.prediction", #"linear.prediction", "probability"
+                include.resid.var = FALSE, 
+                returnSims = FALSE, 
+                seed = NULL,
+                fix.intercept.variance = FALSE)
+new.data <- cbind(new.data, prediction_int_fe)
+```
+
+```{r}
+new.data.summ <- new.data %>%
+  dplyr::group_by(diagnosis, t1_ageyrs, AOI, block, ot1, ot2, ot3) %>%
+  dplyr::summarise(fit=mean(fit),
+            upr=mean(upr),
+            lwr=mean(lwr)) %>%
+  mutate(age.group=ifelse(t1_ageyrs<14, "6-14", 
+                          ifelse(t1_ageyrs>=14 & t1_ageyrs<18, "14-18",
+                                 ">18")))
+new.data.summ$age.group <- factor(new.data.summ$age.group, levels=c("6-14",
+                                                                    "14-18",
+                                                                    ">18"))
+```
+```{r}
+plot.fit.fem.face <- ggplot(subset(new.data.summ, AOI=="h.head")) + 
+  geom_path(aes(x=block/2, 
+                y=fit*100, 
+                color=diagnosis, 
+                group=interaction(diagnosis, t1_ageyrs),
+                alpha=t1_ageyrs)) +
+  facet_grid(~AOI, scales = "free_y") + 
+  scale_color_manual(values=c(NT="slateblue1", 
+                              AUT="springgreen3")) +
+  theme_bw() + 
+  labs(y="", 
+       x="", 
+       color="Diagnosis",
+       title="",
+       subtitle="Subset: Females") +
+  scale_alpha(name="Age",
+              range=c(0.05,1),
+              breaks=c(6,10,14,18,25,30)) +
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5))
+plot.fit.fem.face
+```
+
+```{r}
+library(ggpubr)
+fit.plot.face.gs <- ggarrange(plot.fit.nt.face,
+                           plot.fit.asd.face,
+                           nrow = 2, 
+                           common.legend = TRUE, 
+                           legend = "right")
+fit.plot.face.ss <- ggarrange(plot.fit.fem.face,
+                           plot.fit.mal.face,
+                           nrow = 2, 
+                           common.legend = TRUE, 
+                           legend = "right")
+```
+
+
+```{r}
+fit.plot.face.gs2 <- annotate_figure(fit.plot.face.gs,
+                top = text_grob("Static Social Scenes Task", size = 14)
+                # , bottom = text_grob("Time (s)", size = 10),
+                # left = text_grob("Percentage Looking Time (%)", rot = 90)
+)
+fit.plot.face.ss2 <- annotate_figure(fit.plot.face.ss,
+                # top = text_grob("Pop-Out Task", size = 14),
+                bottom = text_grob("Time (s)", size = 10)
+                # , left = text_grob("Percentage Looking Time (%)", rot = 90)
+)
+fit.ss.plots <- ggarrange(fit.plot.face.gs2, fit.plot.face.ss2, nrow = 2)
+
+ggsave(plot = fit.ss.plots, filename = "Plots/fit-ss.pdf", height = 12, width = 5)
+```
