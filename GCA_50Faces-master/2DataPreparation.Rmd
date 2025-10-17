@@ -1,0 +1,355 @@
+---
+title: "Data Preparation"
+author: "Teresa Del Bianco"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+In this script, we exclude absent and missing data and aggregate the data into 0.5 seconds timebins. We plot how many AOIs are sampled. 
+
+# Load packages 
+
+```{r, message = FALSE, warning = FALSE, include = FALSE}
+packs <- c("R.matlab", "reshape2", "dplyr", "multidplyr", "ggplot2", "tidyr")
+lapply(packs, require, character.only = TRUE)
+```
+
+# Load data
+
+```{r}
+load("Data/SavedWS/ns-ff-demo-leap.RData")
+```
+
+# Exclude absent data
+
+```{r}
+load("Data/SavedWS/NA_info.RData")
+```
+
+```{r}
+cbfnp.pres <- cbfnp.demo %>% anti_join(not_pres, by=c("id", "time"))
+```
+
+# Add Scenes
+
+```{r}
+scenes <- read.csv("Data/Datasets/scenes.csv") %>%
+  dplyr::select(begin_time_ss.msec, end_time_ss.msec, scene)
+scenes_dur <- read.csv("Data/Datasets/scenes.csv") %>%
+  dplyr::select(scene, duration_ss.ms)
+head(scenes)
+scenes_dur
+```
+## Merge
+
+```{r}
+cbfnp.pres.s <- cbfnp.pres %>% 
+  mutate(scene=case_when(time>=scenes[1,1] & time<=scenes[1,2] ~ scenes[1,3],
+                         time>=scenes[2,1] & time<=scenes[2,2] ~ scenes[2,3],
+                         time>=scenes[3,1] & time<=scenes[3,2] ~ scenes[3,3],
+                         time>=scenes[4,1] & time<=scenes[4,2] ~ scenes[4,3],
+                         time>=scenes[5,1] & time<=scenes[5,2] ~ scenes[5,3],
+                         time>=scenes[6,1] & time<=scenes[6,2] ~ scenes[6,3],
+                         time>=scenes[7,1] & time<=scenes[7,2] ~ scenes[7,3],
+                         time>=scenes[8,1] & time<=scenes[8,2] ~ scenes[8,3],
+                         time>=scenes[9,1] & time<=scenes[9,2] ~ scenes[9,3],
+                         time>=scenes[10,1] & time<=scenes[10,2] ~ scenes[10,3],
+                         time>=scenes[11,1] & time<=scenes[11,2] ~ scenes[11,3],
+                         time>=scenes[12,1] & time<=scenes[12,2] ~ scenes[12,3],
+                         time>=scenes[13,1] & time<=scenes[13,2] ~ scenes[13,3],
+                         time>=scenes[14,1] & time<=scenes[14,2] ~ scenes[14,3]),
+         f_on=ifelse(is.na(scene), 0, 1))
+head(cbfnp.pres.s)
+```
+```{r}
+cbfnp.ext <- cbfnp.pres.s %>% left_join(data_miss_abs.s, by=c("id", "time", "scene", "f_on"))
+```
+
+# Select when face is on
+
+```{r}
+cbfnp.pres.f_on <- cbfnp.ext %>%
+  filter(f_on==1)
+head(cbfnp.pres.f_on)
+```
+# Create epochs/blocks
+
+```{r}
+library(itsadug)
+cbfnp.epoch <- cbfnp.pres.f_on %>%
+  group_by(id, scene, aoi.name) %>%
+  mutate(time_z=time-head(time,1),
+         epoch.0125=timeBins(time_z, 0.125, pos = 1),
+         epoch.025=timeBins(time_z, 0.25, pos = 1),
+         epoch.05=timeBins(time_z, 0.5, pos = 1),
+         epoch.1=timeBins(time_z, 1, pos = 1),
+         epoch.2=timeBins(time_z, 2, pos = 1),
+         epoch.3=timeBins(time_z, 3, pos = 1)) %>%
+  dplyr::select(id, diagnosis, site, sex, ageyrs, scene, time, time_z, 
+         epoch.0125, epoch.025, epoch.05, epoch.1, epoch.2, epoch.3,
+         aoi.name, plt, missing)
+cbfnp.epoch
+```
+# Select scenes with min. duration of 3 secs
+
+```{r}
+scenes_dur_3 <- scenes_dur %>%
+  filter(duration_ss.ms>=3)
+```
+
+```{r}
+cbfnp.epoch_3 <- cbfnp.epoch %>% filter(scene %in% scenes_dur_3$scene)
+```
+## Cut remaining seconds > 3
+
+```{r}
+cbfnp.epoch_3_cut <- cbfnp.epoch_3 %>%
+  filter(time_z<3.1)
+```
+
+# Select 50% subset (only in the preliminary phase)
+
+```{r}
+# ids <- distinct(as.data.frame(cbfnp.epoch_3), id)
+# set.seed(88)
+# sb <- ids[sample(nrow(ids), nrow(ids)/2), ]
+# 
+# cbfnp.epoch_3_train <- filter(cbfnp.epoch_3, id %in% sb)
+```
+
+# Aggregate data 
+
+## 0.125-seconds epoch
+
+```{r}
+# data.aggr.0125 <- cbfnp.epoch_3_train %>%  
+#   group_by(id, diagnosis, site, sex, ageyrs, epoch.0125, aoi.name, scene) %>%
+#   summarise(n.nm=length(!is.na(plt)),
+#             m.plt=mean(plt, na.rm=T)) %>%
+#   collect() 
+# head(data.aggr.0125)
+```
+
+## 0.25-seconds epoch
+
+```{r}
+# data.aggr.025 <- cbfnp.epoch_3_train %>%  
+#   group_by(id, diagnosis, site, sex, ageyrs, epoch.025, aoi.name, scene) %>%
+#   summarise(n.nm=length(!is.na(plt)),
+#             m.plt=mean(plt, na.rm=T)) %>%
+#   collect() 
+# head(data.aggr.025)
+```
+## 0.50-seconds epoch
+
+```{r}
+data.aggr.05 <- cbfnp.epoch_3_cut %>%  
+  group_by(id, diagnosis, site, sex, ageyrs, epoch.05, aoi.name, scene) %>%
+  summarise(n.nm=length(!is.na(plt)),
+            m.plt=mean(plt, na.rm=T),
+            m.miss=mean(missing, na.rm=T)) %>%
+  collect() 
+head(data.aggr.05)
+```
+
+```{r}
+save(data.aggr.05, file = "Data/SavedWS/data-aois-NS.RData")
+```
+
+## 1-seconds epoch
+
+```{r}
+# data.aggr.1 <- cbfnp.epoch_3_train %>%  
+#   group_by(id, diagnosis, site, sex, ageyrs, epoch.1, aoi.name, scene) %>%
+#   summarise(n.nm=length(!is.na(plt)),
+#             m.plt=mean(plt, na.rm=T)) %>%
+#   collect() 
+# head(data.aggr.1)
+# unique(data.aggr.1$scene)
+```
+
+# Select aoi==face only
+
+```{r}
+# data.aggr.025.f <- data.aggr.025 %>%
+#   filter(aoi.name=="face")
+data.aggr.05.f <- data.aggr.05 %>%
+  filter(aoi.name=="face")
+# data.aggr.1.f <- data.aggr.1 %>%
+#   filter(aoi.name=="face")
+```
+
+
+# Add polynomials
+
+```{r}
+# e <- unique(data.aggr.025[c("scene", "epoch.025")]) %>% arrange(scene)
+# s <- unique(e$scene)
+# ep25 <- data.frame()
+# for (i in 1:length(s)) {
+#   sb = subset(e, scene==s[i])
+#   t = poly(sb$epoch.025, 3)
+#   ep_t = cbind(as.data.frame(seq(from = min(sb$epoch.025), 
+#                                  to = max(sb$epoch.025), 
+#                                  by = min(sb$epoch.025))), 
+#                as.data.frame(t[,]))
+#   colnames(ep_t) <- c("epoch.025", "ot1", "ot2", "ot3")
+#   ep_t$scene = s[i]
+#   
+#   ep25 = rbind(ep25, ep_t)
+# }
+```
+
+```{r}
+e <- unique(data.aggr.05.f[c("scene", "epoch.05")]) %>% arrange(scene)
+s <- unique(e$scene)
+ep5 <- data.frame()
+for (i in 1:length(s)) {
+  sb = subset(e, scene==s[i])
+  t = poly(sb$epoch.05, 3)
+  ep_t = cbind(as.data.frame(seq(from = min(sb$epoch.05), 
+                                 to = max(sb$epoch.05), 
+                                 by = min(sb$epoch.05))), 
+               as.data.frame(t[,]))
+  colnames(ep_t) <- c("epoch.05", "ot1", "ot2", "ot3")
+  ep_t$scene = s[i]
+  
+  ep5 = rbind(ep5, ep_t)
+}
+```
+
+```{r}
+# e <- unique(data.aggr.1[c("scene", "epoch.1")]) %>% arrange(scene)
+# s <- unique(e$scene)
+# ep1 <- data.frame()
+# for (i in 1:length(s)) {
+#   sb = subset(e, scene==s[i])
+#   t = poly(sb$epoch.1, 3)
+#   ep_t = cbind(as.data.frame(seq(from = min(sb$epoch.1), 
+#                                  to = max(sb$epoch.1), 
+#                                  by = min(sb$epoch.1))), 
+#                as.data.frame(t[,]))
+#   colnames(ep_t) <- c("epoch.1", "ot1", "ot2", "ot3")
+#   ep_t$scene = s[i]
+#   
+#   ep1 = rbind(ep1, ep_t)
+# }
+```
+
+```{r}
+# data.aggr.025.p <- left_join(data.aggr.025, ep25, by=c("epoch.025", "scene"))
+data.aggr.05.p <- left_join(data.aggr.05.f, ep5, by=c("epoch.05", "scene"))
+# data.aggr.1.p <- left_join(data.aggr.1, ep1, by=c("epoch.1", "scene"))
+```
+
+## N of samples
+
+```{r}
+# max(data.aggr.025.p$n.nm)
+max(data.aggr.05.p$n.nm)
+# max(data.aggr.1.p$n.nm)
+```
+
+```{r}
+filter(data.aggr.05.p, m.miss>0.75)
+```
+# Plot the averaged raw data
+
+## Plt by sex and diagnosis
+
+```{r}
+data.aggr.05.p <- filter(data.aggr.05.p, scene!="L2")
+```
+
+```{r}
+# cols <- c("0.25"="orange","0.50"="blue","1.0"="lightblue")
+# av.025 <- data.aggr.025.p %>%
+#   group_by(epoch.025, aoi.name, scene) %>%
+#   summarise(M=mean(m.plt, na.rm = TRUE))
+av.05 <- data.aggr.05.p %>%
+  group_by(epoch.05, aoi.name, scene, diagnosis, sex) %>%
+  summarise(N=n(),
+            M=mean(m.plt, na.rm = TRUE),
+            S=sd(m.plt, na.rm = TRUE),
+            E=qnorm(0.975)*S/sqrt(N),
+            CIL=M-E,
+            CIU=M+E)
+# av.1 <- data.aggr.1.p %>%
+#   group_by(epoch.1, aoi.name, scene) %>%
+#   summarise(M=mean(m.plt, na.rm = TRUE))
+ggplot(data=av.05) +
+  # geom_line(aes(x=epoch.025-0.25, y=M, col="0.25"), data=av.025) +
+  geom_ribbon(aes(x=epoch.05-0.5, y=M, ymin=CIL, ymax=CIU, fill=sex), alpha=0.5) +
+  geom_line(aes(x=epoch.05-0.5, y=M, col=sex)) +
+  # geom_line(aes(x=epoch.1-1, y=M, col="1.0"), data=av.1) +
+  labs(x="Seconds", y="Proportional Looking Time") +
+  scale_x_continuous(breaks = seq(from=0, to=5, by=0.25)) +
+  facet_grid(scene~diagnosis) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust=1)) +
+  scale_colour_manual(name="Sex", values=c("orange", "seagreen")) +
+  scale_fill_manual(name="Sex", values=c("orange", "seagreen")) +
+  ylim(0,1)
+# ggsave(file="Plots/face-ns-byscene.pdf", width = 12, height = 7)
+```
+
+## Proportion of missing data by sex and diagnosis
+
+```{r}
+# cols <- c("0.25"="orange","0.50"="blue","1.0"="lightblue")
+# av.025 <- data.aggr.025.p %>%
+#   group_by(epoch.025, aoi.name, scene) %>%
+#   summarise(M=mean(m.plt, na.rm = TRUE))
+av.m.miss <- data.aggr.05.p %>%
+  group_by(epoch.05, aoi.name, scene, diagnosis, sex) %>%
+  summarise(N=n(),
+            M=mean(m.miss, na.rm = TRUE),
+            S=sd(m.miss, na.rm = TRUE),
+            E=qnorm(0.975)*S/sqrt(N),
+            CIL=M-E,
+            CIU=M+E)
+# av.1 <- data.aggr.1.p %>%
+#   group_by(epoch.1, aoi.name, scene) %>%
+#   summarise(M=mean(m.plt, na.rm = TRUE))
+ggplot(data=av.m.miss) +
+  # geom_line(aes(x=epoch.025-0.25, y=M, col="0.25"), data=av.025) +
+  geom_ribbon(aes(x=epoch.05-0.5, y=M, ymin=CIL, ymax=CIU, fill=sex), alpha=0.5) +
+  geom_line(aes(x=epoch.05-0.5, y=M, col=sex)) +
+  # geom_line(aes(x=epoch.1-1, y=M, col="1.0"), data=av.1) +
+  labs(x="Seconds", y="Proportion Missing Data") +
+  scale_x_continuous(breaks = seq(from=0, to=5, by=0.25)) +
+  facet_grid(scene~diagnosis) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust=1)) +
+  scale_colour_manual(name="Sex", values=c("orange", "seagreen")) +
+  scale_fill_manual(name="Sex", values=c("orange", "seagreen")) +
+  ylim(0,1)
+# ggsave(file="Plots/miss-ns-byscene.pdf", width = 12, height = 7)
+```
+# Exclude scenes where proportion of missing data > 0.75
+
+```{r}
+nrow(to_excl) / nrow(data.aggr.05.p) * 100
+```
+
+```{r}
+data.aggr.05.clean <- anti_join(data.aggr.05.p, to_excl, by=c("id", "scene"))
+```
+
+Add the NA % info
+
+```{r}
+data.aggr.05.clean.ext <- data.aggr.05.clean %>% 
+  left_join(p_NA, by=c("id", "scene", "diagnosis", "site", "ageyrs")) %>%
+  mutate(pNA=pNA/100)
+```
+# Exclude samples where proportion of missing data > 0.75
+
+```{r}
+data.aggr.05.clean2.ext <- filter(data.aggr.05.clean.ext, m.miss<0.75)
+```
+
+```{r}
+save(data.aggr.05.p, 
+     data.aggr.05.clean.ext,
+     data.aggr.05.clean2.ext,
+     file = "Data/SavedWS/data-model.RData")
+```
