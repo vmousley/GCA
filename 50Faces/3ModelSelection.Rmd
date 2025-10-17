@@ -1,0 +1,1830 @@
+---
+title: "Model Selection"
+author: "Teresa Del Bianco"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+We use the same dataset of the GCA Analysis Static Social Scenes of Del Bianco, Mason, Charman et al., 2020. 
+
+Exclude L2 for now! Not coded
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include = FALSE}
+# Load packages
+packs <- c("dplyr", "ggplot2", "lmerTest", "merTools", "broom.mixed", "car", "knitr", "reshape2")
+lapply(packs, require, character.only = TRUE)
+```
+
+```{r, include=FALSE}
+# Read Data 
+load("Data/SavedWS/data-model.RData")
+```
+
+```{r}
+data.aggr.05.clean2.ext <- dplyr::filter(data.aggr.05.clean2.ext, scene!="L2")
+```
+
+```{r}
+data.aggr.05.clean2.ext$scene2 <- as.numeric(data.aggr.05.clean2.ext$scene)
+```
+
+```{r}
+data.aggr.05.clean2.ext$diagnosis <- factor(data.aggr.05.clean2.ext$diagnosis, levels=c("NT", "AUT"))
+```
+
+# Polynomial order decision on split datasets
+
+```{r}
+data.aggr.05.clean2.ext$site_diagn_age <- interaction(data.aggr.05.clean2.ext$site,
+                                        data.aggr.05.clean2.ext$diagnosis,
+                                        data.aggr.05.clean2.ext$schedule_adj)
+
+site_diagn_age <- unique(subset(data.aggr.05.clean2.ext, select = c("id", "sex", "site_diagn_age")))
+
+males_s <- subset(site_diagn_age, sex == "Male")
+females_s <- subset(site_diagn_age, sex == "Female")
+
+library(caret)
+train_index_m <- createDataPartition(
+  males_s$site_diagn_age,
+  times = 1,
+  p = 0.75,
+  list = FALSE)
+train_index_f <- createDataPartition(
+  females_s$site_diagn_age,
+  times = 1,
+  p = 0.75,
+  list = FALSE)
+
+malesTrain <- males_s[train_index_m,]
+femalesTrain  <- females_s[train_index_f,]
+
+Train <- rbind(malesTrain, femalesTrain)
+
+data.aggr.05.clean2.ext.train <- inner_join(data.aggr.05.clean2.ext, Train, by=c("id", "sex", "site_diagn_age"))
+data.aggr.05.clean2.ext.test <- anti_join(data.aggr.05.clean2.ext, Train, by=c("id", "sex", "site_diagn_age"))
+```
+
+```{r}
+prop.table(table(data.aggr.05.clean2.ext.train$diagnosis, data.aggr.05.clean2.ext.train$sex), 2)
+prop.table(table(data.aggr.05.clean2.ext.train$site, data.aggr.05.clean2.ext.train$sex), 2)
+prop.table(table(data.aggr.05.clean2.ext.train$schedule_adj, data.aggr.05.clean2.ext.train$sex), 2)
+```
+
+```{r}
+prop.table(table(data.aggr.05.clean2.ext.test$diagnosis, data.aggr.05.clean2.ext.test$sex), 2)
+prop.table(table(data.aggr.05.clean2.ext.test$site, data.aggr.05.clean2.ext.test$sex), 2)
+prop.table(table(data.aggr.05.clean2.ext.test$schedule_adj, data.aggr.05.clean2.ext.test$sex), 2)
+```
+
+## Model Selection on the Training Set
+
+We are going to test a 2nd polynomial order implying 2 changes of focus. 
+
+```{r}
+library(lmerTest)
+library(merTools)
+base.tr <- lmer(m.plt ~ epoch.05 + (1 + epoch.05 | id), 
+                  control = lmerControl(optimizer="bobyqa"), 
+                  data=data.aggr.05.clean2.ext.train)
+quad.base.tr <- lmer(m.plt ~ (ot1+ot2) + (1 + (ot1) | id),
+                  control = lmerControl(optimizer="bobyqa"),
+                  data=data.aggr.05.clean2.ext.train)
+quad.base.tr.sc <- lmer(m.plt ~ (ot1+ot2) + (1 + (ot1) | id) + (1 | scene2), 
+                  control = lmerControl(optimizer="bobyqa"), 
+                  data=data.aggr.05.clean2.ext.train)
+quad.base.tr.sc.sit <- lmer(m.plt ~ (ot1+ot2) + (1 + (ot1) | site/id) + (1 | scene2), 
+                  control = lmerControl(optimizer="bobyqa"), 
+                  data=data.aggr.05.clean2.ext.train)
+
+m.sel.tr <- anova(base.tr, quad.base.tr, quad.base.tr.sc, quad.base.tr.sc.sit)
+# mses.tr <- cbind(LI= RMSE.merMod(base.tr), QU=RMSE.merMod(quad.base.tr.sc))
+```
+
+## Test Set
+
+```{r}
+base.te <- lmer(m.plt ~ epoch.05 + (1 + epoch.05 | id), 
+                  control = lmerControl(optimizer="bobyqa"), 
+                  data=data.aggr.05.clean2.ext.test)
+quad.base.te <- lmer(m.plt ~ (ot1+ot2) + (1 + (ot1) | id),
+                  control = lmerControl(optimizer="bobyqa"),
+                  data=data.aggr.05.clean2.ext.test)
+quad.base.te.sc <- lmer(m.plt ~ (ot1+ot2) + (1 + (ot1) | id) + (1 | scene2), 
+                  control = lmerControl(optimizer="bobyqa"), 
+                  data=data.aggr.05.clean2.ext.test)
+quad.base.te.sc.sit <- lmer(m.plt ~ (ot1+ot2) + (1 + (ot1) | site/id) + (1 | scene2), 
+                  control = lmerControl(optimizer="bobyqa"), 
+                  data=data.aggr.05.clean2.ext.test)
+
+m.sel.te <- anova(base.te, quad.base.te, quad.base.te.sc, quad.base.te.sc.sit)
+mses.te <- cbind(LI= RMSE.merMod(base.te), QU=RMSE.merMod(quad.base.te.sc))
+```
+
+## Print
+
+```{r}
+library(flextable)
+library(officer)
+```
+
+```{r}
+tr.te.sel <- m.sel.tr %>%
+  tidy() %>%
+  rbind(tidy(m.sel.te)) %>%
+  mutate_if(is.numeric, round, 2) %>%
+  flextable() %>%
+  theme_box() %>%
+  autofit()
+```
+
+```{r}
+my_doc <- read_docx()
+my_doc <-  my_doc %>%
+body_add_par(value = "Training vs Test Set") %>%
+  body_add_par(value = "") %>%
+  body_add_flextable(tr.te.sel, align = "left") %>%
+  body_add_par(value = "") %>%
+
+print(my_doc, target = "Output/tables_tr_te.docx") %>% invisible()
+```
+
+# Group Comparisons
+
+## Model NT
+
+```{r}
+nt.data <- subset(data.aggr.05.clean2.ext, diagnosis == "NT")
+# nt.data$sex <- factor(nt.data$sex, levels = c("Male", "Female"))
+```
+```{r}
+nt.base <- lmer(m.plt ~ (ot1+ot2) + (1 + (ot1) | id) + (1 | scene2), 
+                control = lmerControl(optimizer="bobyqa"), 
+                data=nt.data)
+nt.sex <- lmer(m.plt ~ (ot1+ot2) + sex + (1 + (ot1) | id) + (1 | scene2), 
+               control = lmerControl(optimizer="bobyqa"), data=nt.data)
+
+nt.sex.i <- lmer(m.plt ~ (ot1+ot2) * sex + (1 + (ot1) | id) + (1 | scene2), 
+                 control = lmerControl(optimizer="bobyqa"), 
+                 data=nt.data)
+```
+```{r}
+av.nt <- anova(nt.base, nt.sex, nt.sex.i)
+av.nt
+```
+
+```{r}
+nt.sex.age <- lmer(m.plt ~ (ot1+ot2) + sex + ageyrs + (1 + (ot1) | id) + (1 | scene2), 
+                   control = lmerControl(optimizer="bobyqa"), 
+                   data=nt.data)
+nt.sex.age.i <- lmer(m.plt ~ (ot1+ot2) + sex * ageyrs + (1 + (ot1) | id) + (1 | scene2),
+                     control = lmerControl(optimizer="bobyqa"), 
+                     data=nt.data)
+```
+
+```{r}
+nt.sel.m <- anova(nt.sex, nt.sex.age, nt.sex.age.i)
+nt.sel.m
+```
+
+```{r}
+nt.sex.age.na <- lmer(m.plt ~ (ot1+ot2) + sex + ageyrs + pNA + (1 + (ot1) | id) + (1 | scene2), 
+                   control = lmerControl(optimizer="bobyqa"), 
+                   data=nt.data)
+nt.sel.na <- anova(nt.sex.age, nt.sex.age.na)
+nt.sel.na
+```
+
+
+```{r}
+set.seed(88)
+conf.int.sex.age.nt <-  confint(nt.sex.age.na, method="boot", nsim=200, oldNames=FALSE,
+                                parallel="multicore", ncpus=4)
+conf.nt.re <- data.frame(conf.int.sex.age.nt[c(1:5),]) %>% 
+  tibble::rownames_to_column("term") %>%
+  rename(`CI 2.5%`=X2.5..,
+         `CI 97.5%`=X97.5..)
+conf.nt.coef <- data.frame(conf.int.sex.age.nt[-c(1:5),]) %>% 
+  tibble::rownames_to_column("term") %>%
+  rename(`CI 2.5%`=X2.5..,
+         `CI 97.5%`=X97.5..) 
+
+coefs.sex.nt <- as.data.frame(coef(summary(nt.sex.age.na))) %>%
+  add_rownames(var = "term") %>%
+  inner_join(conf.nt.coef, by="term") %>%
+  mutate_if(is.numeric, round, 3)
+
+re.sex.nt <- as.data.frame(VarCorr(nt.sex.age.na)) %>%
+  mutate(term=ifelse(is.na(var1) & is.na(var2), "sigma", 
+                     ifelse(!is.na(var2) & !is.na(var1), paste0("cor_", var2, ".", var1, "|", grp), 
+                            paste0("sd_", var1, "|", grp)))) %>%
+  dplyr::select(term, sdcor) %>%
+  inner_join(conf.nt.re, by="term") %>%
+  mutate_if(is.numeric, round, 3)
+```
+```{r}
+nt_ind_ns <- coef(nt.base)$id %>%
+  tibble::rownames_to_column("id")
+write.csv(nt_ind_ns, "Data/Datasets/Exported/nt_ind_ns.csv")
+```
+
+
+### Deviance Test
+
+```{r}
+library(car)
+library(broom)
+dev.nt <- tidy(Anova(nt.sex.age, type = "III")) %>%
+  mutate(p.value=ifelse(p.value<0.01, "<0.01", paste(p.value))) %>%
+  mutate_if(is.numeric, funs(round(., 2)))
+```
+
+### Plot
+
+#### Gather all coefficients
+
+```{r}
+f.nt <- as.data.frame(cbind(
+  Int=coefs.sex.nt[1,2]$Estimate,
+  ot1=coefs.sex.nt[2,2]$Estimate,
+  ot2=coefs.sex.nt[3,2]$Estimate,
+  CIL.Int=coefs.sex.nt[1,7]$`CI 2.5%`,
+  CIL.ot1=coefs.sex.nt[2,7]$`CI 2.5%`,
+  CIL.ot2=coefs.sex.nt[3,7]$`CI 2.5%`,
+  CIU.Int=coefs.sex.nt[1,8]$`CI 97.5%`,
+  CIU.ot1=coefs.sex.nt[2,8]$`CI 97.5%`,
+  CIU.ot2=coefs.sex.nt[3,8]$`CI 97.5%`
+))
+```
+```{r}
+m.nt <- as.data.frame(cbind(
+  Int=coefs.sex.nt[1,2]$Estimate + coefs.sex.nt[4,2]$Estimate,
+  ot1=coefs.sex.nt[2,2]$Estimate,
+  ot2=coefs.sex.nt[3,2]$Estimate,
+  CIL.Int=coefs.sex.nt[1,7]$`CI 2.5%` + coefs.sex.nt[4,7]$`CI 2.5%`,
+  CIL.ot1=coefs.sex.nt[2,7]$`CI 2.5%`,
+  CIL.ot2=coefs.sex.nt[3,7]$`CI 2.5%`,
+  CIU.Int=coefs.sex.nt[1,8]$`CI 97.5%` + coefs.sex.nt[4,8]$`CI 97.5%`,
+  CIU.ot1=coefs.sex.nt[2,8]$`CI 97.5%`,
+  CIU.ot2=coefs.sex.nt[3,8]$`CI 97.5%`
+))
+```
+
+#### Fixed Effects
+
+```{r}
+time <- seq(from = 0.5, to = 3.5, by = 0.5)
+ot1 <- unique(data.aggr.05.clean2.ext[c("epoch.05", "ot1")]) %>% arrange(epoch.05) 
+ot2 <- unique(data.aggr.05.clean2.ext[c("epoch.05", "ot2")]) %>% arrange(epoch.05) 
+ot3 <- unique(data.aggr.05.clean2.ext[c("epoch.05", "ot3")]) %>% arrange(epoch.05) 
+```
+
+
+```{r}
+f.nt.xy <- as.data.frame(cbind(Time=time,
+                               Y=(f.nt$Int + 
+                                 f.nt$ot1*ot1$ot1 + 
+                                 f.nt$ot2*ot2$ot2),
+                               sex="f",
+                               diagnosis="NT"
+                               )
+                         )
+m.nt.xy <- as.data.frame(cbind(Time=time,
+                               Y=(m.nt$Int + 
+                                 m.nt$ot1*ot1$ot1 + 
+                                 m.nt$ot2*ot2$ot2),
+                               sex="m",
+                               diagnosis="NT"
+                               )
+                         )
+xy.nt <- rbind(f.nt.xy, m.nt.xy)
+```
+
+#### Confidence Intervals
+```{r}
+f.nt.CIU <- as.data.frame(cbind(Time=time,
+                               CIU=(f.nt$CIU.Int + 
+                                 f.nt$CIU.ot1*ot1$ot1 + 
+                                 f.nt$CIU.ot2*ot2$ot2),
+                               sex="f",
+                               diagnosis="NT"
+                               )
+                         )
+m.nt.CIU <- as.data.frame(cbind(Time=time,
+                               CIU=(m.nt$CIU.Int + 
+                                 m.nt$CIU.ot1*ot1$ot1 + 
+                                 m.nt$CIU.ot2*ot2$ot2),
+                               sex="m",
+                               diagnosis="NT"
+                               )
+                         )
+CIU.nt <- rbind(f.nt.CIU, m.nt.CIU)
+```
+
+```{r}
+f.nt.CIL <- as.data.frame(cbind(Time=time,
+                               CIL=(f.nt$CIL.Int + 
+                                 f.nt$CIL.ot1*ot1$ot1 + 
+                                 f.nt$CIL.ot2*ot2$ot2),
+                               sex="f",
+                               diagnosis="NT"
+                               )
+                         )
+m.nt.CIL <- as.data.frame(cbind(Time=time,
+                              CIL=(m.nt$CIL.Int + 
+                                 m.nt$CIL.ot1*ot1$ot1 + 
+                                 m.nt$CIL.ot2*ot2$ot2),
+                               sex="m",
+                               diagnosis="NT"
+                               )
+                         )
+CIL.nt <- rbind(f.nt.CIL, m.nt.CIL)
+```
+
+#### Random Effect
+
+```{r}
+re.nt.id <- as.data.frame(VarCorr(nt.sex.age.na))[1,5]
+re.nt.slope <- as.data.frame(VarCorr(nt.sex.age.na))[2,5]
+re.nt.scene <- as.data.frame(VarCorr(nt.sex.age.na))[4,5]
+re.nt.sidual <- as.data.frame(VarCorr(nt.sex.age.na))[5,5]
+```
+```{r}
+f.nt.re <- as.data.frame(cbind(Time=time,
+                               REU=f.nt$Int+re.nt.id + (f.nt$ot1+re.nt.slope)*ot1$ot1 + f.nt$ot2*ot2$ot2, 
+                               REL=f.nt$Int-re.nt.id + (f.nt$ot1-re.nt.slope)*ot1$ot1 + f.nt$ot2*ot2$ot2,
+                                   sex="f",
+                                   diagnosis="NT"
+                            ))
+m.nt.re <- as.data.frame(cbind(Time=time,
+                               REU=m.nt$Int+re.nt.id + (m.nt$ot1+re.nt.slope)*ot1$ot1 + m.nt$ot2*ot2$ot2,
+                               REL=m.nt$Int-re.nt.id + (m.nt$ot1-re.nt.slope)*ot1$ot1 + m.nt$ot2*ot2$ot2,
+                            sex="m",
+                            diagnosis="NT"))
+                               
+nt.re <- rbind(f.nt.re, m.nt.re)
+```
+```{r}
+
+f.nt.sc <- as.data.frame(cbind(Time=time,
+                            REU.sc=(f.nt$Int+re.nt.scene + 
+                                      (f.nt$ot1)*ot1$ot1 +
+                                    f.nt$ot2*ot2$ot2),
+                            REL.sc=(f.nt$Int-re.nt.scene + 
+                                      (f.nt$ot1)*ot1$ot1 +
+                                    f.nt$ot2*ot2$ot2),
+                            sex="f",
+                            diagnosis="NT"
+                            ))
+m.nt.sc <- as.data.frame(cbind(Time=time,
+                            REU.sc=(m.nt$Int+re.nt.scene + 
+                                      (m.nt$ot1)*unique(nt.data$ot1) +
+                                    m.nt$ot2*unique(nt.data$ot2)),
+                            REL.sc=(m.nt$Int-re.nt.scene + 
+                                      (m.nt$ot1)*unique(nt.data$ot1) +
+                                    m.nt$ot2*unique(nt.data$ot2)),
+                            sex="m",
+                            diagnosis="NT"
+                            ))
+nt.sc <- rbind(f.nt.sc, m.nt.sc)
+```
+
+```{r}
+ds.nt <- left_join(xy.nt, CIL.nt, by=c("Time", "sex", "diagnosis")) %>%
+  left_join(CIU.nt, by=c("Time", "sex", "diagnosis")) %>%
+  left_join(nt.re, by=c("Time", "sex", "diagnosis")) %>%
+  left_join(nt.sc, by=c("Time", "sex", "diagnosis")) %>%
+  mutate_at(vars(-sex, -diagnosis), function(.) as.numeric(as.character(.))) 
+```
+
+```{r}
+library(ggplot2)
+
+cols.fix <- c("f"="#E69F00", "m"="#009E73")
+cols.re <- c("f"="#E69F00", "m"="#009E73")
+
+nt.plot <- ggplot(data=ds.nt) +
+  
+  # facet_wrap(~sex) +
+  
+  #RE Uncertainty
+  #ID
+  geom_ribbon(aes(ymin=REL,
+                  ymax=REU,
+                  x=Time,
+                  group=sex,
+                  fill=sex),
+              alpha=0.1) +
+  #SCENE
+  geom_ribbon(aes(ymin=REL.sc,
+                  ymax=REU.sc,
+                  x=Time,
+                  group=sex,
+                  fill=sex),
+              alpha=0.2) +
+  
+  #---
+  #FE SEX
+  ## Fitted Y
+  geom_path(aes(x = Time,
+                y= Y,
+                col=sex)) +
+  ## CI U
+  geom_path(aes(x = Time,
+        y= CIU,
+        col=sex), 
+    linetype="dashed") +
+  ## CI L
+  geom_path(aes(x = Time,
+        y= CIL,
+        col=sex), 
+    linetype="dashed") +
+
+scale_color_manual(values = cols.fix, name="Sex") +
+        
+  scale_fill_manual(values = cols.re, name="Random Effect") +
+  labs(y = "Proportional Looking Time (fitted)", x = "Time in Scene (s)",
+       subtitle = "Model 1 (non-autistic group)") +
+  scale_y_continuous(breaks = seq(from=0, to=1, by=0.25), limits = c(0,1.2)) +
+  theme(legend.position = "top", text=element_text(size=18)) 
+nt.plot
+ggsave(filename = "Plots/model-nt.pdf", plot = nt.plot)
+```
+
+## Model AUT
+
+```{r}
+aut.data <- subset(data.aggr.05.clean2.ext, diagnosis == "AUT")
+# aut.data$sex <- factor(aut.data$sex, levels = c("Male", "Female"))
+
+```
+```{r}
+aut.base <- lmer(m.plt ~ (ot1+ot2) + (1 + ot1| id) + (1 | scene2), 
+                control = lmerControl(optimizer="bobyqa"), 
+                data=aut.data)
+aut.sex <- lmer(m.plt ~ (ot1+ot2) + sex + (1  + ot1| id) + (1 | scene2), 
+               control = lmerControl(optimizer="bobyqa"), data=aut.data)
+
+aut.sex.i <- lmer(m.plt ~ (ot1+ot2) * sex + (1  + ot1| id) + (1 | scene2), 
+                 control = lmerControl(optimizer="bobyqa"), 
+                 data=aut.data)
+```
+```{r}
+av.aut <- anova(aut.base, aut.sex, aut.sex.i)
+av.aut
+```
+
+```{r}
+aut.sex.age <- lmer(m.plt ~ (ot1+ot2) * sex + ageyrs + (1 + ot1| id) + (1 | scene2), 
+                   control = lmerControl(optimizer="bobyqa"), 
+                   data=aut.data)
+aut.sex.age.i <- lmer(m.plt ~ (ot1+ot2) * sex * ageyrs + (1 + ot1 | id) + (1 | scene2),
+                     control = lmerControl(optimizer="bobyqa"), 
+                     data=aut.data)
+```
+
+```{r}
+aut.sel.m <- anova(aut.sex.i, aut.sex.age, aut.sex.age.i)
+aut.sel.m
+```
+
+```{r}
+aut.sex.age.na <- lmer(m.plt ~ (ot1+ot2) * sex + ageyrs + pNA + (1 + ot1| id) + (1 | scene2), 
+                   control = lmerControl(optimizer="bobyqa"), 
+                   data=aut.data)
+aut.sel.na <- anova(aut.sex.age, aut.sex.age.na)
+aut.sel.na
+```
+
+```{r}
+set.seed(88)
+conf.aut.sex <-  confint(aut.sex.age.na, method="boot", nsim=200, oldNames=FALSE,
+                                parallel="multicore", ncpus=4)
+
+conf.aut.re <- data.frame(conf.aut.sex[c(1:5),]) %>% 
+  tibble::rownames_to_column("term") %>%
+  rename(`CI 2.5%`=X2.5..,
+         `CI 97.5%`=X97.5..)
+
+conf.aut.coef <- data.frame(conf.aut.sex[-c(1:5),]) %>% 
+  tibble::rownames_to_column("term") %>%
+  rename(`CI 2.5%`=X2.5..,
+         `CI 97.5%`=X97.5..) 
+
+coefs.sex.aut <- as.data.frame(coef(summary(aut.sex.age.na))) %>%
+  add_rownames(var = "term") %>%
+  inner_join(conf.aut.coef, by="term") %>%
+  mutate_if(is.numeric, round, 3)
+
+re.sex.aut <- as.data.frame(VarCorr(aut.sex.age.na)) %>%
+  mutate(term=ifelse(is.na(var1) & is.na(var2), "sigma", 
+                     ifelse(!is.na(var2) & !is.na(var1), paste0("cor_", var2, ".", var1, "|", grp), 
+                            paste0("sd_", var1, "|", grp)))) %>%
+  dplyr::select(term, sdcor) %>%
+  inner_join(conf.aut.re, by="term") %>%
+  mutate_if(is.numeric, round, 3)
+```
+
+```{r}
+aut_ind_ns <- coef(aut.base)$id %>%
+  tibble::rownames_to_column("id")
+write.csv(aut_ind_ns, "Data/Datasets/Exported/aut_ind_ns.csv")
+```
+
+### Deviance Test
+
+```{r}
+library(car)
+dev.aut <- tidy(Anova(aut.sex.age.na, type = "III")) %>%
+  mutate(p.value=ifelse(p.value<0.01, "<0.01", paste(round(p.value, 2)))) %>%
+  mutate_if(is.numeric, funs(round(., 2)))
+```
+
+### Plot
+
+#### Gather all coefficients
+
+```{r}
+f.aut <- as.data.frame(cbind(
+  Int=coefs.sex.aut[1,2]$Estimate,
+  ot1=coefs.sex.aut[2,2]$Estimate,
+  ot2=coefs.sex.aut[3,2]$Estimate,
+  CIL.Int=coefs.sex.aut[1,7]$`CI 2.5%`,
+  CIL.ot1=coefs.sex.aut[2,7]$`CI 2.5%`,
+  CIL.ot2=coefs.sex.aut[3,7]$`CI 2.5%`,
+  CIU.Int=coefs.sex.aut[1,8]$`CI 97.5%`,
+  CIU.ot1=coefs.sex.aut[2,8]$`CI 97.5%`,
+  CIU.ot2=coefs.sex.aut[3,8]$`CI 97.5%`
+))
+```
+```{r}
+m.aut <- as.data.frame(cbind(
+  Int=coefs.sex.aut[1,2]$Estimate + coefs.sex.aut[4,2]$Estimate,
+  ot1=coefs.sex.aut[2,2]$Estimate + coefs.sex.aut[7,2]$Estimate,
+  ot2=coefs.sex.aut[3,2]$Estimate + coefs.sex.aut[8,2]$Estimate,
+  CIL.Int=coefs.sex.aut[1,7]$`CI 2.5%` + coefs.sex.aut[4,7]$`CI 2.5%`,
+  CIL.ot1=coefs.sex.aut[2,7]$`CI 2.5%` + coefs.sex.aut[7,7]$`CI 2.5%`,
+  CIL.ot2=coefs.sex.aut[3,7]$`CI 2.5%` + coefs.sex.aut[8,7]$`CI 2.5%`,
+  CIU.Int=coefs.sex.aut[1,8]$`CI 97.5%` + coefs.sex.aut[4,8]$`CI 97.5%`,
+  CIU.ot1=coefs.sex.aut[2,8]$`CI 97.5%` + coefs.sex.aut[7,8]$`CI 97.5%`,
+  CIU.ot2=coefs.sex.aut[3,8]$`CI 97.5%` + coefs.sex.aut[8,8]$`CI 97.5%`
+))
+```
+
+#### Fixed Effects
+
+```{r}
+time <- seq(from = 0.5, to = 3.5, by = 0.5)
+ot1 <- unique(data.aggr.05.clean2.ext[c("epoch.05", "ot1")]) %>% arrange(epoch.05) 
+ot2 <- unique(data.aggr.05.clean2.ext[c("epoch.05", "ot2")]) %>% arrange(epoch.05) 
+ot3 <- unique(data.aggr.05.clean2.ext[c("epoch.05", "ot3")]) %>% arrange(epoch.05) 
+```
+
+```{r}
+f.aut.xy <- as.data.frame(cbind(Time=time,
+                               Y=(f.aut$Int + 
+                                 f.aut$ot1*ot1$ot1 + 
+                                 f.aut$ot2*ot2$ot2),
+                               sex="f",
+                               diagnosis="NT"
+                               )
+                         )
+m.aut.xy <- as.data.frame(cbind(Time=time,
+                               Y=(m.aut$Int + 
+                                 m.aut$ot1*ot1$ot1 + 
+                                 m.aut$ot2*ot2$ot2),
+                               sex="m",
+                               diagnosis="NT"
+                               )
+                         )
+xy.aut <- rbind(f.aut.xy, m.aut.xy)
+```
+
+#### Confidence Intervals
+```{r}
+f.aut.CIU <- as.data.frame(cbind(Time=time,
+                               CIU=(f.aut$CIU.Int + 
+                                 f.aut$CIU.ot1*ot1$ot1 + 
+                                 f.aut$CIU.ot2*ot2$ot2),
+                               sex="f",
+                               diagnosis="NT"
+                               )
+                         )
+m.aut.CIU <- as.data.frame(cbind(Time=time,
+                               CIU=(m.aut$CIU.Int + 
+                                 m.aut$CIU.ot1*ot1$ot1 + 
+                                 m.aut$CIU.ot2*ot2$ot2),
+                               sex="m",
+                               diagnosis="NT"
+                               )
+                         )
+CIU.aut <- rbind(f.aut.CIU, m.aut.CIU)
+```
+
+```{r}
+f.aut.CIL <- as.data.frame(cbind(Time=time,
+                               CIL=(f.aut$CIL.Int + 
+                                 f.aut$CIL.ot1*ot1$ot1 + 
+                                 f.aut$CIL.ot2*ot2$ot2),
+                               sex="f",
+                               diagnosis="NT"
+                               )
+                         )
+m.aut.CIL <- as.data.frame(cbind(Time=time,
+                              CIL=(m.aut$CIL.Int + 
+                                 m.aut$CIL.ot1*ot1$ot1 + 
+                                 m.aut$CIL.ot2*ot2$ot2),
+                               sex="m",
+                               diagnosis="NT"
+                               )
+                         )
+CIL.aut <- rbind(f.aut.CIL, m.aut.CIL)
+```
+
+#### Random Effect
+
+```{r}
+re.aut.id <- as.data.frame(VarCorr(aut.sex.age.na))[1,5]
+re.aut.slope <- as.data.frame(VarCorr(aut.sex.age.na))[2,5]
+re.aut.scene <- as.data.frame(VarCorr(aut.sex.age.na))[4,5]
+re.aut.sidual <- as.data.frame(VarCorr(aut.sex.age.na))[5,5]
+```
+```{r}
+f.aut.re <- as.data.frame(cbind(Time=time,
+                               REU=f.aut$Int+re.aut.id + (f.aut$ot1+re.aut.slope)*ot1$ot1 + f.aut$ot2*ot2$ot2, 
+                               REL=f.aut$Int-re.aut.id + (f.aut$ot1-re.aut.slope)*ot1$ot1 + f.aut$ot2*ot2$ot2,
+                                   sex="f",
+                                   diagnosis="NT"
+                            ))
+m.aut.re <- as.data.frame(cbind(Time=time,
+                               REU=m.aut$Int+re.aut.id + (m.aut$ot1+re.aut.slope)*ot1$ot1 + m.aut$ot2*ot2$ot2,
+                               REL=m.aut$Int-re.aut.id + (m.aut$ot1-re.aut.slope)*ot1$ot1 + m.aut$ot2*ot2$ot2,
+                            sex="m",
+                            diagnosis="NT"))
+                               
+aut.re <- rbind(f.aut.re, m.aut.re)
+```
+```{r}
+
+f.aut.sc <- as.data.frame(cbind(Time=time,
+                            REU.sc=(f.aut$Int+re.aut.scene + 
+                                      (f.aut$ot1)*ot1$ot1 +
+                                    f.aut$ot2*ot2$ot2),
+                            REL.sc=(f.aut$Int-re.aut.scene + 
+                                      (f.aut$ot1)*ot1$ot1 +
+                                    f.aut$ot2*ot2$ot2),
+                            sex="f",
+                            diagnosis="NT"
+                            ))
+m.aut.sc <- as.data.frame(cbind(Time=time,
+                            REU.sc=(m.aut$Int+re.aut.scene + 
+                                      (m.aut$ot1)*unique(aut.data$ot1) +
+                                    m.aut$ot2*unique(aut.data$ot2)),
+                            REL.sc=(m.aut$Int-re.aut.scene + 
+                                      (m.aut$ot1)*unique(aut.data$ot1) +
+                                    m.aut$ot2*unique(aut.data$ot2)),
+                            sex="m",
+                            diagnosis="NT"
+                            ))
+aut.sc <- rbind(f.aut.sc, m.aut.sc)
+```
+
+```{r}
+ds.aut <- left_join(xy.aut, CIL.aut, by=c("Time", "sex", "diagnosis")) %>%
+  left_join(CIU.aut, by=c("Time", "sex", "diagnosis")) %>%
+  left_join(aut.re, by=c("Time", "sex", "diagnosis")) %>%
+  left_join(aut.sc, by=c("Time", "sex", "diagnosis")) %>%
+  mutate_at(vars(-sex, -diagnosis), function(.) as.numeric(as.character(.))) 
+```
+
+```{r}
+library(ggplot2)
+
+cols.fix <- c("f"="#E69F00", "m"="#009E73")
+cols.re <- c("f"="#E69F00", "m"="#009E73")
+
+aut.plot <- ggplot(data=ds.aut) +
+  
+  # facet_wrap(~sex) +
+  
+  #RE Uncertainty
+  #ID
+  geom_ribbon(aes(ymin=REL,
+                  ymax=REU,
+                  x=Time,
+                  group=sex,
+                  fill=sex),
+              alpha=0.1) +
+  #SCENE
+  geom_ribbon(aes(ymin=REL.sc,
+                  ymax=REU.sc,
+                  x=Time,
+                  group=sex,
+                  fill=sex),
+              alpha=0.2) +
+  
+  #---
+  #FE SEX
+  ## Fitted Y
+  geom_path(aes(x = Time,
+                y= Y,
+                col=sex)) +
+  ## CI U
+  geom_path(aes(x = Time,
+        y= CIU,
+        col=sex), 
+    linetype="dashed") +
+  ## CI L
+  geom_path(aes(x = Time,
+        y= CIL,
+        col=sex), 
+    linetype="dashed") +
+
+scale_color_manual(values = cols.fix, name="Sex") +
+        
+  scale_fill_manual(values = cols.re, name="Random Effect") +
+  labs(y = "Proportional Looking Time (fitted)", x = "Time in Scene (s)",
+       subtitle = "Model 2 (autistic group)") +
+  scale_y_continuous(breaks = seq(from=0, to=1, by=0.25), limits = c(0,1.2)) +
+  theme(legend.position = "top", text=element_text(size=18)) +
+  theme(plot.subtitle = element_text(hjust = 0.5))
+aut.plot
+ggsave(filename = "Plots/model-aut.pdf", plot = aut.plot)
+```
+
+## Model males
+
+```{r}
+d.mal <- subset(data.aggr.05.clean2.ext, sex == "Male")
+male.base <- lmer(m.plt ~ (ot1+ot2) + (1 + ot1| id) + (1 | scene2), 
+                  control = lmerControl(optimizer="bobyqa"),
+                  data=d.mal)
+
+male.group <- lmer(m.plt ~ (ot1+ot2) + diagnosis + (1 + ot1| id) + (1 | scene2), 
+                   control = lmerControl(optimizer="bobyqa"),
+                   data=d.mal)
+
+male.group.i <- lmer(m.plt ~ (ot1+ot2) * diagnosis + (1 + ot1| id) + (1 | scene2), 
+                       control = lmerControl(optimizer="bobyqa"), 
+                       data=d.mal)
+
+male.group.age <- lmer(m.plt ~ (ot1+ot2) * diagnosis + ageyrs + (1 + ot1| id) + (1 | scene2), 
+                       control = lmerControl(optimizer="bobyqa"), 
+                       data=d.mal)
+
+male.group.age.i <- lmer(m.plt ~ (ot1+ot2) * diagnosis * ageyrs + (1 + ot1| id) + (1 | scene2), 
+                         control = lmerControl(optimizer="bobyqa"),
+                         data=d.mal)
+
+m.sel.m <- anova(male.base, male.group, male.group.i, male.group.age, male.group.age.i)
+
+male.group.age.na <- lmer(m.plt ~ (ot1+ot2) * diagnosis + ageyrs + pNA + (1 + ot1| id) + (1 | scene2), 
+                       control = lmerControl(optimizer="bobyqa"), 
+                       data=d.mal)
+
+m.sel.na <- anova(male.group.age, male.group.age.na)
+```
+
+```{r}
+male_ind_ns <- coef(male.base)$id %>%
+  tibble::rownames_to_column("id")
+write.csv(male_ind_ns, "Data/Datasets/Exported/male_ind_ns.csv")
+```
+
+### Deviance test
+
+```{r}
+library(car)
+dev.mal <- tidy(Anova(male.group.age.na, type = "III")) %>%
+  mutate_if(is.numeric, funs(round(.,2)))
+```
+
+```{r}
+set.seed(88)
+conf.int.mal <-  confint(male.group.age.na, method="boot", nsim=200, oldNames=FALSE,
+                                parallel="multicore", ncpus=4)
+conf.mal.re <- data.frame(conf.int.mal[c(1:5),]) %>% 
+  tibble::rownames_to_column("term") %>%
+  rename(`CI 2.5%`=X2.5..,
+         `CI 97.5%`=X97.5..)
+conf.mal.coef <- data.frame(conf.int.mal[-c(1:5),]) %>% 
+  tibble::rownames_to_column("term") %>%
+  rename(`CI 2.5%`=X2.5..,
+         `CI 97.5%`=X97.5..) 
+
+coefs.sex.mal <- as.data.frame(coef(summary(male.group.age.na))) %>%
+  add_rownames(var = "term") %>%
+  inner_join(conf.mal.coef, by="term") %>%
+  mutate_if(is.numeric, round, 3)
+
+re.sex.mal <- as.data.frame(VarCorr(male.group.age.na)) %>%
+  mutate(term=ifelse(is.na(var1) & is.na(var2), "sigma", 
+                     ifelse(!is.na(var2) & !is.na(var1), paste0("cor_", var2, ".", var1, "|", grp), 
+                            paste0("sd_", var1, "|", grp)))) %>%
+  dplyr::select(term, sdcor) %>%
+  inner_join(conf.mal.re, by="term") %>%
+  mutate_if(is.numeric, round, 3)
+```
+
+#### Gather all coefficients
+
+```{r}
+nt.m <- as.data.frame(cbind(
+  Int=coefs.sex.mal[1,2]$Estimate,
+  ot1=coefs.sex.mal[2,2]$Estimate,
+  ot2=coefs.sex.mal[3,2]$Estimate,
+  CIL.Int=coefs.sex.mal[1,7]$`CI 2.5%`,
+  CIL.ot1=coefs.sex.mal[2,7]$`CI 2.5%`,
+  CIL.ot2=coefs.sex.mal[3,7]$`CI 2.5%`,
+  CIU.Int=coefs.sex.mal[1,8]$`CI 97.5%`,
+  CIU.ot1=coefs.sex.mal[2,8]$`CI 97.5%`,
+  CIU.ot2=coefs.sex.mal[3,8]$`CI 97.5%`
+))
+```
+```{r}
+aut.m <- as.data.frame(cbind(
+  Int=coefs.sex.mal[1,2]$Estimate + coefs.sex.mal[4,2]$Estimate,
+  ot1=coefs.sex.mal[2,2]$Estimate + coefs.sex.mal[7,2]$Estimate,
+  ot2=coefs.sex.mal[3,2]$Estimate + coefs.sex.mal[8,2]$Estimate,
+  CIL.Int=coefs.sex.mal[1,7]$`CI 2.5%` + coefs.sex.mal[4,7]$`CI 2.5%`,
+  CIL.ot1=coefs.sex.mal[2,7]$`CI 2.5%` + coefs.sex.mal[7,7]$`CI 2.5%`,
+  CIL.ot2=coefs.sex.mal[3,7]$`CI 2.5%` + coefs.sex.mal[8,7]$`CI 2.5%`,
+  CIU.Int=coefs.sex.mal[1,8]$`CI 97.5%` + coefs.sex.mal[4,8]$`CI 97.5%`,
+  CIU.ot1=coefs.sex.mal[2,8]$`CI 97.5%` + coefs.sex.mal[7,8]$`CI 97.5%`,
+  CIU.ot2=coefs.sex.mal[3,8]$`CI 97.5%` + coefs.sex.mal[8,8]$`CI 97.5%`
+))
+```
+
+#### Fixed Effects
+
+```{r}
+time <- seq(from = 0.5, to = 3.5, by = 0.5)
+ot1 <- unique(data.aggr.05.clean2.ext[c("epoch.05", "ot1")]) %>% arrange(epoch.05) 
+ot2 <- unique(data.aggr.05.clean2.ext[c("epoch.05", "ot2")]) %>% arrange(epoch.05) 
+ot3 <- unique(data.aggr.05.clean2.ext[c("epoch.05", "ot3")]) %>% arrange(epoch.05) 
+```
+
+
+```{r}
+nt.m.xy <- as.data.frame(cbind(Time=time,
+                               Y=(nt.m$Int + 
+                                 nt.m$ot1*ot1$ot1 + 
+                                 nt.m$ot2*ot2$ot2),
+                               sex="m",
+                               diagnosis="NT"
+                               )
+                         )
+aut.m.xy <- as.data.frame(cbind(Time=time,
+                               Y=(aut.m$Int + 
+                                 aut.m$ot1*ot1$ot1 + 
+                                 aut.m$ot2*ot2$ot2),
+                               sex="m",
+                               diagnosis="AUT"
+                               )
+                         )
+xy.m <- rbind(nt.m.xy, aut.m.xy)
+```
+
+#### Confidence Intervals
+```{r}
+nt.m.CIU <- as.data.frame(cbind(Time=time,
+                               CIU=(nt.m$CIU.Int + 
+                                 nt.m$CIU.ot1*ot1$ot1 + 
+                                 nt.m$CIU.ot2*ot2$ot2),
+                               sex="m",
+                               diagnosis="NT"
+                               )
+                         )
+aut.m.CIU <- as.data.frame(cbind(Time=time,
+                               CIU=(aut.m$CIU.Int + 
+                                 aut.m$CIU.ot1*ot1$ot1 + 
+                                 aut.m$CIU.ot2*ot2$ot2),
+                               sex="m",
+                               diagnosis="AUT"
+                               )
+                         )
+CIU.m <- rbind(nt.m.CIU, aut.m.CIU)
+```
+
+```{r}
+nt.m.CIL <- as.data.frame(cbind(Time=time,
+                               CIL=(nt.m$CIL.Int + 
+                                 nt.m$CIL.ot1*ot1$ot1 + 
+                                 nt.m$CIL.ot2*ot2$ot2),
+                               sex="m",
+                               diagnosis="NT"
+                               )
+                         )
+aut.m.CIL <- as.data.frame(cbind(Time=time,
+                              CIL=(aut.m$CIL.Int + 
+                                 aut.m$CIL.ot1*ot1$ot1 + 
+                                 aut.m$CIL.ot2*ot2$ot2),
+                               sex="m",
+                               diagnosis="AUT"
+                               )
+                         )
+CIL.m <- rbind(nt.m.CIL, aut.m.CIL)
+```
+
+#### Random Effect
+
+```{r}
+re.m.id <- as.data.frame(VarCorr(male.group.age.na))[1,5]
+re.m.slope <- as.data.frame(VarCorr(male.group.age.na))[2,5]
+re.m.scene <- as.data.frame(VarCorr(male.group.age.na))[4,5]
+re.m.sidual <- as.data.frame(VarCorr(male.group.age.na))[5,5]
+```
+```{r}
+nt.m.re <- as.data.frame(cbind(Time=time,
+                               REU=nt.m$Int+re.m.id + (nt.m$ot1+re.m.slope)*ot1$ot1 + nt.m$ot2*ot2$ot2, 
+                               REL=nt.m$Int-re.m.id + (nt.m$ot1-re.m.slope)*ot1$ot1 + nt.m$ot2*ot2$ot2,
+                                   sex="m",
+                                   diagnosis="NT"
+                            ))
+aut.m.re <- as.data.frame(cbind(Time=time,
+                               REU=aut.m$Int+re.m.id + (aut.m$ot1+re.m.slope)*ot1$ot1 + aut.m$ot2*ot2$ot2,
+                               REL=aut.m$Int-re.m.id + (aut.m$ot1-re.m.slope)*ot1$ot1 + aut.m$ot2*ot2$ot2,
+                            sex="m",
+                            diagnosis="AUT"))
+                               
+m.re <- rbind(nt.m.re, aut.m.re)
+```
+```{r}
+
+nt.m.sc <- as.data.frame(cbind(Time=time,
+                            REU.sc=(nt.m$Int+re.m.scene + 
+                                      (nt.m$ot1)*ot1$ot1 +
+                                    nt.m$ot2*ot2$ot2),
+                            REL.sc=(nt.m$Int-re.m.scene + 
+                                      (nt.m$ot1)*ot1$ot1 +
+                                    nt.m$ot2*ot2$ot2),
+                            sex="m",
+                            diagnosis="NT"
+                            ))
+aut.m.sc <- as.data.frame(cbind(Time=time,
+                            REU.sc=(aut.m$Int+re.m.scene + 
+                                      (aut.m$ot1)*ot1$ot1 +
+                                    aut.m$ot2*ot2$ot2),
+                            REL.sc=(aut.m$Int-re.m.scene + 
+                                      (aut.m$ot1)*ot1$ot1 +
+                                    aut.m$ot2*ot2$ot2),
+                            sex="m",
+                            diagnosis="AUT"
+                            ))
+m.sc <- rbind(nt.m.sc, aut.m.sc)
+```
+
+```{r}
+ds.m <- left_join(xy.m, CIL.m, by=c("Time", "sex", "diagnosis")) %>%
+  left_join(CIU.m, by=c("Time", "sex", "diagnosis")) %>%
+  left_join(m.re, by=c("Time", "sex", "diagnosis")) %>%
+  left_join(m.sc, by=c("Time", "sex", "diagnosis")) %>%
+  mutate_at(vars(-sex, -diagnosis), function(.) as.numeric(as.character(.)))%>%
+  mutate(diagnosis=ifelse(diagnosis=="NT", "non-Autistic", "Autistic"))
+```
+
+```{r}
+library(ggplot2)
+
+cols.fix <- c("Autistic"="#D55E00", "non-Autistic"="#F0E442")
+cols.re <- c("Autistic"="#D55E00", "non-Autistic"="#F0E442")
+
+m.plot <- ggplot(data=ds.m) +
+  
+  # facet_wrap(~diagnosis) +
+  
+  #RE Uncertainty
+  #ID
+  geom_ribbon(aes(ymin=REL,
+                  ymax=REU,
+                  x=Time,
+                  group=diagnosis,
+                  fill=diagnosis),
+              alpha=0.1) +
+  #SCENE
+  geom_ribbon(aes(ymin=REL.sc,
+                  ymax=REU.sc,
+                  x=Time,
+                  group=diagnosis,
+                  fill=diagnosis),
+              alpha=0.2) +
+  
+  #---
+  #FE diagnosis
+  
+        # Black lines
+      geom_path(aes(x = Time,
+                    y= Y,
+                    group=diagnosis), col="black", size=1) +
+      ## CI U
+      geom_path(aes(x = Time,
+            y= CIU,
+            group=diagnosis), 
+        linetype="dashed", col="black") +
+      ## CI L
+      geom_path(aes(x = Time,
+            y= CIL,
+            group=diagnosis), 
+        linetype="dashed", col="black") +
+
+  ## Fitted Y
+  geom_path(aes(x = Time,
+                y= Y,
+                col=diagnosis)) +
+  ## CI U
+  geom_path(aes(x = Time,
+        y= CIU,
+        col=diagnosis), 
+    linetype="dashed") +
+  ## CI L
+  geom_path(aes(x = Time,
+        y= CIL,
+        col=diagnosis), 
+    linetype="dashed") +
+
+scale_color_manual(values = cols.fix, name="Group") +
+        
+  scale_fill_manual(values = cols.re, name="Random Effect") +
+  labs(y = "Proportional Looking Time (fitted)", x = "Time in Scene (s)",
+       subtitle = "Model 3 (males)") +
+  scale_y_continuous(breaks = seq(from=0, to=1, by=0.25), limits = c(0,1.2)) +
+  theme(text=element_text(size=18))
+m.plot
+ggsave(filename = "Plots/model-3-mal-set.pdf", plot = m.plot)
+```
+## Model females
+```{r}
+d.fem <- subset(data.aggr.05.clean2.ext, sex == "Female")
+d.fem$diagnosis <- factor(d.fem$diagnosis, levels = c("NT", "AUT"))
+
+fem.base <- lmer(m.plt ~ (ot1+ot2) + (1 + ot1+ot2| id) + (1 | scene2), 
+                  control = lmerControl(optimizer="bobyqa"),
+                  data=d.fem)
+
+fem.group <- lmer(m.plt ~ (ot1+ot2) + diagnosis + (1 + ot1| id) + (1 | scene2), 
+                   control = lmerControl(optimizer="bobyqa"),
+                   data=d.fem)
+
+fem.group.i <- lmer(m.plt ~ (ot1+ot2) * diagnosis + (1 + ot1| id) + (1 | scene2), 
+                   control = lmerControl(optimizer="bobyqa"),
+                   data=d.fem)
+
+fem.group.age <- lmer(m.plt ~ (ot1+ot2) * diagnosis + ageyrs + (1 + ot1| id) + (1 | scene2), 
+                       control = lmerControl(optimizer="bobyqa"), 
+                       data=d.fem)
+
+fem.group.age.i <- lmer(m.plt ~ (ot1+ot2) * diagnosis * ageyrs + (1 + ot1| id) + (1 | scene2), 
+                         control = lmerControl(optimizer="bobyqa"),
+                         data=d.fem)
+
+f.sel.m <- anova(fem.base, fem.group, fem.group.i, fem.group.age, fem.group.age.i)
+
+fem.group.i.na <- lmer(m.plt ~ (ot1+ot2) * diagnosis + pNA + (1 + ot1| id) + (1 | scene2), 
+                   control = lmerControl(optimizer="bobyqa"),
+                   data=d.fem)
+f.sel.na <- anova(fem.group.i, fem.group.i.na)
+
+```
+
+```{r}
+female_ind_ns <- coef(fem.base)$id %>%
+  tibble::rownames_to_column("id")
+write.csv(female_ind_ns, "Data/Datasets/Exported/female_ind_ns.csv")
+```
+
+### Deviance test
+
+```{r}
+library(car)
+dev.fem <- tidy(Anova(fem.group.i.na, type = "III")) %>%
+  mutate_if(is.numeric, funs(round(.,2)))
+```
+
+```{r}
+set.seed(88)
+conf.int.fem <-  confint(fem.group.i.na, method="boot", nsim=200, oldNames=FALSE,
+                                parallel="multicore", ncpus=4)
+conf.fem.re <- data.frame(conf.int.fem[c(1:5),]) %>% 
+  tibble::rownames_to_column("term") %>%
+  rename(`CI 2.5%`=X2.5..,
+         `CI 97.5%`=X97.5..)
+conf.fem.coef <- data.frame(conf.int.fem[-c(1:5),]) %>% 
+  tibble::rownames_to_column("term") %>%
+  rename(`CI 2.5%`=X2.5..,
+         `CI 97.5%`=X97.5..) 
+
+coefs.sex.fem <- as.data.frame(coef(summary(fem.group.i.na))) %>%
+  add_rownames(var = "term") %>%
+  inner_join(conf.fem.coef, by="term") %>%
+  mutate_if(is.numeric, round, 3)
+
+re.sex.fem <- as.data.frame(VarCorr(fem.group.i.na)) %>%
+  mutate(term=ifelse(is.na(var1) & is.na(var2), "sigma", 
+                     ifelse(!is.na(var2) & !is.na(var1), paste0("cor_", var2, ".", var1, "|", grp), 
+                            paste0("sd_", var1, "|", grp)))) %>%
+  dplyr::select(term, sdcor) %>%
+  inner_join(conf.fem.re, by="term") %>%
+  mutate_if(is.numeric, round, 3)
+```
+
+#### Gather all coefficients
+
+```{r}
+nt.f <- as.data.frame(cbind(
+  Int=coefs.sex.fem[1,2]$Estimate,
+  ot1=coefs.sex.fem[2,2]$Estimate,
+  ot2=coefs.sex.fem[3,2]$Estimate,
+  CIL.Int=coefs.sex.fem[1,7]$`CI 2.5%`,
+  CIL.ot1=coefs.sex.fem[2,7]$`CI 2.5%`,
+  CIL.ot2=coefs.sex.fem[3,7]$`CI 2.5%`,
+  CIU.Int=coefs.sex.fem[1,8]$`CI 97.5%`,
+  CIU.ot1=coefs.sex.fem[2,8]$`CI 97.5%`,
+  CIU.ot2=coefs.sex.fem[3,8]$`CI 97.5%`
+))
+```
+```{r}
+aut.f <- as.data.frame(cbind(
+  Int=coefs.sex.fem[1,2]$Estimate + coefs.sex.fem[4,2]$Estimate,
+  ot1=coefs.sex.fem[2,2]$Estimate + coefs.sex.fem[6,2]$Estimate,
+  ot2=coefs.sex.fem[3,2]$Estimate + coefs.sex.fem[7,2]$Estimate,
+  
+  CIL.Int=coefs.sex.fem[1,7]$`CI 2.5%` + coefs.sex.fem[4,7]$`CI 2.5%`,
+  CIL.ot1=coefs.sex.fem[2,7]$`CI 2.5%` + coefs.sex.fem[6,7]$`CI 2.5%`,
+  CIL.ot2=coefs.sex.fem[3,7]$`CI 2.5%` + coefs.sex.fem[7,7]$`CI 2.5%`,
+  CIU.Int=coefs.sex.fem[1,8]$`CI 97.5%` + coefs.sex.fem[4,8]$`CI 97.5%`,
+  CIU.ot1=coefs.sex.fem[2,8]$`CI 97.5%` + coefs.sex.fem[6,8]$`CI 97.5%`,
+  CIU.ot2=coefs.sex.fem[3,8]$`CI 97.5%` + coefs.sex.fem[7,8]$`CI 97.5%`
+))
+```
+
+#### Fixed Effects
+
+```{r}
+time <- seq(from = 0.5, to = 3.5, by = 0.5)
+ot1 <- unique(data.aggr.05.clean2.ext[c("epoch.05", "ot1")]) %>% arrange(epoch.05) 
+ot2 <- unique(data.aggr.05.clean2.ext[c("epoch.05", "ot2")]) %>% arrange(epoch.05) 
+ot3 <- unique(data.aggr.05.clean2.ext[c("epoch.05", "ot3")]) %>% arrange(epoch.05) 
+```
+
+
+```{r}
+nt.f.xy <- as.data.frame(cbind(Time=time,
+                               Y=(nt.f$Int + 
+                                 nt.f$ot1*ot1$ot1 + 
+                                 nt.f$ot2*ot2$ot2),
+                               sex="f",
+                               diagnosis="NT"
+                               )
+                         )
+aut.f.xy <- as.data.frame(cbind(Time=time,
+                               Y=(aut.f$Int + 
+                                 aut.f$ot1*ot1$ot1 + 
+                                 aut.f$ot2*ot2$ot2),
+                               sex="f",
+                               diagnosis="AUT"
+                               )
+                         )
+xy.f <- rbind(nt.f.xy, aut.f.xy)
+```
+
+#### Confidence Intervals
+```{r}
+nt.f.CIU <- as.data.frame(cbind(Time=time,
+                               CIU=(nt.f$CIU.Int + 
+                                 nt.f$CIU.ot1*ot1$ot1 + 
+                                 nt.f$CIU.ot2*ot2$ot2),
+                               sex="f",
+                               diagnosis="NT"
+                               )
+                         )
+aut.f.CIU <- as.data.frame(cbind(Time=time,
+                               CIU=(aut.f$CIU.Int + 
+                                 aut.f$CIU.ot1*ot1$ot1 + 
+                                 aut.f$CIU.ot2*ot2$ot2),
+                               sex="f",
+                               diagnosis="AUT"
+                               )
+                         )
+CIU.f <- rbind(nt.f.CIU, aut.f.CIU)
+```
+
+```{r}
+nt.f.CIL <- as.data.frame(cbind(Time=time,
+                               CIL=(nt.f$CIL.Int + 
+                                 nt.f$CIL.ot1*ot1$ot1 + 
+                                 nt.f$CIL.ot2*ot2$ot2),
+                               sex="f",
+                               diagnosis="NT"
+                               )
+                         )
+aut.f.CIL <- as.data.frame(cbind(Time=time,
+                              CIL=(aut.f$CIL.Int + 
+                                 aut.f$CIL.ot1*ot1$ot1 + 
+                                 aut.f$CIL.ot2*ot2$ot2),
+                               sex="f",
+                               diagnosis="AUT"
+                               )
+                         )
+CIL.f <- rbind(nt.f.CIL, aut.f.CIL)
+```
+
+#### Random Effect
+
+```{r}
+re.f.id <- as.data.frame(VarCorr(male.group.age.na))[1,5]
+re.f.slope <- as.data.frame(VarCorr(male.group.age.na))[2,5]
+re.f.scene <- as.data.frame(VarCorr(male.group.age.na))[4,5]
+re.f.sidual <- as.data.frame(VarCorr(male.group.age.na))[5,5]
+```
+```{r}
+nt.f.re <- as.data.frame(cbind(Time=time,
+                               REU=nt.f$Int+re.f.id + (nt.f$ot1+re.f.slope)*ot1$ot1 + nt.f$ot2*ot2$ot2, 
+                               REL=nt.f$Int-re.f.id + (nt.f$ot1-re.f.slope)*ot1$ot1 + nt.f$ot2*ot2$ot2,
+                                   sex="f",
+                                   diagnosis="NT"
+                            ))
+aut.f.re <- as.data.frame(cbind(Time=time,
+                               REU=aut.f$Int+re.f.id + (aut.f$ot1+re.f.slope)*ot1$ot1 + aut.f$ot2*ot2$ot2,
+                               REL=aut.f$Int-re.f.id + (aut.f$ot1-re.f.slope)*ot1$ot1 + aut.f$ot2*ot2$ot2,
+                            sex="f",
+                            diagnosis="AUT"))
+                               
+f.re <- rbind(nt.f.re, aut.f.re)
+```
+```{r}
+
+nt.f.sc <- as.data.frame(cbind(Time=time,
+                            REU.sc=(nt.f$Int+re.f.scene + 
+                                      (nt.f$ot1)*ot1$ot1 +
+                                    nt.f$ot2*ot2$ot2),
+                            REL.sc=(nt.f$Int-re.f.scene + 
+                                      (nt.f$ot1)*ot1$ot1 +
+                                    nt.f$ot2*ot2$ot2),
+                            sex="f",
+                            diagnosis="NT"
+                            ))
+aut.f.sc <- as.data.frame(cbind(Time=time,
+                            REU.sc=(aut.f$Int+re.f.scene + 
+                                      (aut.f$ot1)*ot1$ot1 +
+                                    aut.f$ot2*ot2$ot2),
+                            REL.sc=(aut.f$Int-re.f.scene + 
+                                      (aut.f$ot1)*ot1$ot1 +
+                                    aut.f$ot2*ot2$ot2),
+                            sex="f",
+                            diagnosis="AUT"
+                            ))
+f.sc <- rbind(nt.f.sc, aut.f.sc)
+```
+
+```{r}
+ds.f <- left_join(xy.f, CIL.f, by=c("Time", "sex", "diagnosis")) %>%
+  left_join(CIU.f, by=c("Time", "sex", "diagnosis")) %>%
+  left_join(f.re, by=c("Time", "sex", "diagnosis")) %>%
+  left_join(f.sc, by=c("Time", "sex", "diagnosis")) %>%
+  mutate_at(vars(-sex, -diagnosis), function(.) as.numeric(as.character(.))) %>%
+  mutate(diagnosis=ifelse(diagnosis=="NT", "non-Autistic", "Autistic"))
+```
+
+```{r}
+library(ggplot2)
+
+cols.fix <- c("Autistic"="#D55E00", "non-Autistic"="#F0E442")
+cols.re <- c("Autistic"="#D55E00", "non-Autistic"="#F0E442")
+
+f.plot <- ggplot(data=ds.f) +
+  
+  # facet_wrap(~diagnosis) +
+  
+  #RE Uncertainty
+  #ID
+  geom_ribbon(aes(ymin=REL,
+                  ymax=REU,
+                  x=Time,
+                  group=diagnosis,
+                  fill=diagnosis),
+              alpha=0.1) +
+  #SCENE
+  geom_ribbon(aes(ymin=REL.sc,
+                  ymax=REU.sc,
+                  x=Time,
+                  group=diagnosis,
+                  fill=diagnosis),
+              alpha=0.2) +
+  
+  #---
+  #FE diagnosis
+  
+        # Black lines
+      geom_path(aes(x = Time,
+                    y= Y,
+                    group=diagnosis), col="black", size=1) +
+      ## CI U
+      geom_path(aes(x = Time,
+            y= CIU,
+            group=diagnosis), 
+        linetype="dashed", col="black") +
+      ## CI L
+      geom_path(aes(x = Time,
+            y= CIL,
+            group=diagnosis), 
+        linetype="dashed", col="black") +
+
+  ## Fitted Y
+  geom_path(aes(x = Time,
+                y= Y,
+                col=diagnosis)) +
+  ## CI U
+  geom_path(aes(x = Time,
+        y= CIU,
+        col=diagnosis), 
+    linetype="dashed") +
+  ## CI L
+  geom_path(aes(x = Time,
+        y= CIL,
+        col=diagnosis), 
+    linetype="dashed") +
+
+scale_color_manual(values = cols.fix, name="Group") +
+        
+  scale_fill_manual(values = cols.re, name="Random Effect") +
+  labs(y = "Proportional Looking Time (fitted)", x = "Time in Scene (s)",
+       subtitle = "Model 4 (females)") +
+  scale_y_continuous(breaks = seq(from=0, to=1, by=0.25), limits = c(0,1.2)) +
+  theme(text=element_text(size=18)) 
+f.plot
+ggsave(filename = "Plots/model-f.pdf", plot = f.plot)
+```
+
+```{r}
+library(patchwork)
+comb <- nt.plot + aut.plot & theme(legend.position = "top", legend.direction = "horizontal", 
+        legend.box = "horizontal"
+        )
+comb <- comb + plot_layout(guides = "collect")
+comb2 <- m.plot + f.plot & theme(legend.position = "top", legend.direction = "horizontal", 
+        legend.box = "horizontal"
+        )
+comb2 <- comb2 + plot_layout(guides = "collect")
+```
+```{r}
+comb.all <- nt.plot + aut.plot + m.plot + f.plot & theme(legend.position = "top", 
+                                                         legend.direction = "horizontal", 
+                                                         legend.box = "horizontal"
+                                                         ) 
+comb.all <- comb.all + plot_layout(ncol=4) + plot_layout(guides = "collect")
+comb.all
+ggsave(filename = "Plots/m1234.pdf", plot = comb.all, height = 7, width = 14)
+```
+
+
+# Data Missingness
+
+## M & F
+
+```{r}
+na.male.group.age <- lmer(pNA ~ (ot1+ot2) * diagnosis + ageyrs + (1 | id) + (1 | scene2), 
+                       control = lmerControl(optimizer="bobyqa"), 
+                       data=d.mal)
+ci.na.mal <- confint(na.male.group.age, oldNames=FALSE)
+cit.na.mal <- as.data.frame(ci.na.mal)[-c(1:3),] %>%
+  tibble::rownames_to_column(var = "term") 
+na.mal.coef <- as.data.frame(coef(summary(na.male.group.age))) %>%
+tibble::rownames_to_column(var = "term") %>%
+  left_join(cit.na.mal, by="term") %>%
+  mutate_if(is.numeric, round, 2)
+```
+
+```{r}
+na.male.dev <- tidy(Anova(na.male.group.age, type = "III")) %>%
+  mutate_if(is.numeric, funs(round(.,2)))
+```
+
+```{r}
+na.fem.group.i <- lmer(pNA ~ (ot1+ot2) * diagnosis + (1 | id) + (1 | scene2), 
+                   control = lmerControl(optimizer="bobyqa"),
+                   data=d.fem)
+ci.na.fem <- confint(na.fem.group.i, oldNames=FALSE)
+cit.na.fem <- as.data.frame(ci.na.fem)[-c(1:3),] %>%
+  tibble::rownames_to_column(var = "term") 
+na.fem.coef <- as.data.frame(coef(summary(na.fem.group.i))) %>%
+tibble::rownames_to_column(var = "term") %>%
+  left_join(cit.na.fem, by="term") %>%
+  mutate_if(is.numeric, round, 2)
+```
+
+```{r}
+na.female.dev <- tidy(Anova(na.fem.group.i, type = "III")) %>%
+  mutate_if(is.numeric, funs(round(.,2)))
+```
+
+## NT & AUT
+
+```{r}
+na.nt.sex.age <- lmer(pNA ~ (ot1+ot2) + sex + ageyrs + (1 | id) + (1 | scene2), 
+                   control = lmerControl(optimizer="bobyqa"), 
+                   data=nt.data)
+ci.na.nt <- confint(na.nt.sex.age, oldNames=FALSE)
+cit.na.nt <- as.data.frame(ci.na.nt)[-c(1:3),] %>%
+  tibble::rownames_to_column(var = "term") 
+na.nt.coef <- as.data.frame(coef(summary(na.nt.sex.age))) %>%
+tibble::rownames_to_column(var = "term") %>%
+  left_join(cit.na.nt, by="term") %>%
+  mutate_if(is.numeric, round, 2)
+```
+
+```{r}
+na.nt.dev <- tidy(Anova(na.nt.sex.age, type = "III")) %>%
+  mutate_if(is.numeric, funs(round(.,2)))
+```
+
+```{r}
+na.aut.sex.age <- lmer(pNA ~ (ot1+ot2) * sex + ageyrs + (1 | id) + (1 | scene2), 
+                   control = lmerControl(optimizer="bobyqa"), 
+                   data=aut.data)
+ci.na.aut <- confint(na.aut.sex.age, oldNames=FALSE)
+cit.na.aut <- as.data.frame(ci.na.aut)[-c(1:3),] %>%
+  tibble::rownames_to_column(var = "term") 
+na.aut.coef <- as.data.frame(coef(summary(na.aut.sex.age))) %>%
+tibble::rownames_to_column(var = "term") %>%
+  left_join(cit.na.aut, by="term") %>%
+  mutate_if(is.numeric, round, 2)
+```
+
+```{r}
+na.aut.dev <- tidy(Anova(na.aut.sex.age, type = "III")) %>%
+  mutate_if(is.numeric, funs(round(.,2)))
+```
+
+# Print
+
+```{r}
+library(flextable)
+library(officer)
+```
+
+```{r}
+s.nt <- av.nt %>%
+  tidy() %>%
+  rbind(tidy(nt.sel.m)) %>%
+  rbind(tidy(nt.sel.na)) %>%
+  mutate_if(is.numeric, round, 2) %>%
+  flextable() %>%
+  theme_box() %>%
+  autofit()
+c.nt <- coefs.sex.nt %>%
+  flextable() %>%
+  theme_box() %>%
+  autofit()
+re.nt <- re.sex.nt %>%
+  flextable() %>%
+  theme_box() %>%
+  autofit()
+d.nt <- dev.nt %>%
+  flextable() %>%
+  theme_box() %>%
+  autofit()
+```
+
+```{r}
+s.aut <- av.aut %>%
+  tidy() %>%
+  rbind(tidy(aut.sel.m)) %>%
+  rbind(tidy(aut.sel.na)) %>%
+  mutate_if(is.numeric, round, 2) %>%
+  flextable() %>%
+  theme_box() %>%
+  autofit()
+c.aut <- coefs.sex.aut %>%
+  flextable() %>%
+  theme_box() %>%
+  autofit()
+re.aut <- re.sex.aut %>%
+  flextable() %>%
+  theme_box() %>%
+  autofit()
+d.aut <- dev.aut %>%
+  flextable() %>%
+  theme_box() %>%
+  autofit()
+```
+
+```{r}
+s.mal <- m.sel.m %>%
+  tidy() %>%
+  rbind(tidy(m.sel.na)) %>%
+  mutate_if(is.numeric, round, 2) %>%
+  flextable() %>%
+  theme_box() %>%
+  autofit()
+c.mal <- coefs.sex.mal %>%
+  flextable() %>%
+  theme_box() %>%
+  autofit()
+re.mal <- re.sex.mal %>%
+  flextable() %>%
+  theme_box() %>%
+  autofit()
+dv.mal <- dev.mal %>%
+  flextable() %>%
+  theme_box() %>%
+  autofit()
+```
+
+```{r}
+s.fem <- f.sel.m %>%
+  tidy() %>%
+  rbind(tidy(f.sel.na)) %>%
+  mutate_if(is.numeric, round, 2) %>%
+  flextable() %>%
+  theme_box() %>%
+  autofit()
+c.fem <- coefs.sex.fem %>%
+  flextable() %>%
+  theme_box() %>%
+  autofit()
+re.fem <- re.sex.fem %>%
+  flextable() %>%
+  theme_box() %>%
+  autofit()
+dv.fem <- dev.fem %>%
+  flextable() %>%
+  theme_box() %>%
+  autofit()
+```
+
+```{r}
+na.mal <- na.mal.coef %>%
+  flextable() %>%
+  theme_box() %>%
+  autofit()
+na.mal.d <- na.male.dev %>%
+  flextable() %>%
+  theme_box() %>%
+  autofit()
+```
+
+```{r}
+na.fem <- na.fem.coef %>%
+  flextable() %>%
+  theme_box() %>%
+  autofit()
+na.fem.d <- na.female.dev %>%
+  flextable() %>%
+  theme_box() %>%
+  autofit()
+```
+
+```{r}
+na.nt <- na.nt.coef %>%
+  flextable() %>%
+  theme_box() %>%
+  autofit()
+na.nt.d <- na.nt.dev %>%
+  flextable() %>%
+  theme_box() %>%
+  autofit()
+```
+
+```{r}
+na.aut <- na.aut.coef %>%
+  flextable() %>%
+  theme_box() %>%
+  autofit()
+na.aut.d <- na.aut.dev %>%
+  flextable() %>%
+  theme_box() %>%
+  autofit()
+```
+
+```{r}
+my_doc <- read_docx()
+my_doc <-  my_doc %>%
+body_add_par(value = "Subset: NT") %>%
+  body_add_par(value = "") %>%
+  body_add_par(value = "Model Selection:") %>%
+  body_add_par(value = "") %>%
+  body_add_flextable(s.nt, align = "left") %>%
+  body_add_par(value = "") %>%
+  body_add_par(value = "Model Output:") %>%
+  body_add_par(value = "") %>%
+  body_add_flextable(c.nt, align = "left") %>%
+  body_add_par(value = "") %>%
+  body_add_par(value = "Deviance Test:") %>%
+  body_add_par(value = "") %>%
+  body_add_flextable(d.nt, align = "left") %>%
+  body_add_par(value = "") %>%
+  body_add_par(value = "Random Effect:") %>%
+  body_add_par(value = "") %>%
+  body_add_flextable(re.nt, align = "left") %>%
+  body_add_par(value = "") %>%
+  
+body_add_par(value = "Subset: AUT") %>%
+  body_add_par(value = "") %>%
+  body_add_par(value = "Model Selection:") %>%
+  body_add_par(value = "") %>%
+  body_add_flextable(s.aut, align = "left") %>%
+  body_add_par(value = "") %>%
+  body_add_par(value = "Model Output:") %>%
+  body_add_par(value = "") %>%
+  body_add_flextable(c.aut, align = "left") %>%
+  body_add_par(value = "") %>%
+  body_add_par(value = "Deviance Test:") %>%
+  body_add_par(value = "") %>%
+  body_add_flextable(d.aut, align = "left") %>%
+  body_add_par(value = "") %>%
+  body_add_par(value = "Random Effect:") %>%
+  body_add_par(value = "") %>%
+  body_add_flextable(re.aut, align = "left") %>%
+  body_add_par(value = "") %>%
+  
+body_add_par(value = "Subset: MALES") %>%
+  body_add_par(value = "") %>%
+  body_add_par(value = "Model Selection:") %>%
+  body_add_par(value = "") %>%
+  body_add_flextable(s.mal, align = "left") %>%
+  body_add_par(value = "") %>%
+  body_add_par(value = "Model Output:") %>%
+  body_add_par(value = "") %>%
+  body_add_flextable(c.mal, align = "left") %>%
+  body_add_par(value = "") %>%
+  body_add_par(value = "Deviance Test:") %>%
+  body_add_par(value = "") %>%
+  body_add_flextable(dv.mal, align = "left") %>%
+  body_add_par(value = "") %>%
+  body_add_par(value = "Random Effect:") %>%
+  body_add_par(value = "") %>%
+  body_add_flextable(re.mal, align = "left") %>%
+  body_add_par(value = "") %>%
+  
+body_add_par(value = "Subset: FEMALES") %>%
+  body_add_par(value = "") %>%
+  body_add_par(value = "Model Selection:") %>%
+  body_add_par(value = "") %>%
+  body_add_flextable(s.fem, align = "left") %>%
+  body_add_par(value = "") %>%
+  body_add_par(value = "Model Output:") %>%
+  body_add_par(value = "") %>%
+  body_add_flextable(c.fem, align = "left") %>%
+  body_add_par(value = "") %>%
+  body_add_par(value = "Deviance Test:") %>%
+  body_add_par(value = "") %>%
+  body_add_flextable(dv.fem, align = "left") %>%
+  body_add_par(value = "") %>%
+  body_add_par(value = "Random Effect:") %>%
+  body_add_par(value = "") %>%
+  body_add_flextable(re.fem, align = "left") %>%
+  body_add_par(value = "")
+  
+# body_add_par(value = "Data Missingness: MALES") %>%
+#   body_add_par(value = "") %>%
+#   body_add_par(value = "Model Output:") %>%
+#   body_add_par(value = "") %>%
+#   body_add_flextable(na.mal, align = "left") %>%
+#   body_add_par(value = "") %>%
+#   body_add_par(value = "Deviance Test:") %>%
+#   body_add_par(value = "") %>%
+#   body_add_flextable(na.mal.d, align = "left") %>%
+#   body_add_par(value = "") %>%
+# body_add_par(value = "Data Missingness: FEMALES") %>%
+#   body_add_par(value = "") %>%
+#   body_add_par(value = "Model Output:") %>%
+#   body_add_par(value = "") %>%
+#   body_add_flextable(na.fem, align = "left") %>%
+#   body_add_par(value = "") %>%
+#   body_add_par(value = "Deviance Test:") %>%
+#   body_add_par(value = "") %>%
+#   body_add_flextable(na.fem.d, align = "left") %>%
+#   body_add_par(value = "") %>%
+# body_add_par(value = "Data Missingness: NT") %>%
+#   body_add_par(value = "") %>%
+#   body_add_par(value = "Model Output:") %>%
+#   body_add_par(value = "") %>%
+#   body_add_flextable(na.nt, align = "left") %>%
+#   body_add_par(value = "") %>%
+#   body_add_par(value = "Deviance Test:") %>%
+#   body_add_par(value = "") %>%
+#   body_add_flextable(na.nt.d, align = "left") %>%
+#   body_add_par(value = "") %>%
+# body_add_par(value = "Data Missingness: AUT") %>%
+#   body_add_par(value = "") %>%
+#   body_add_par(value = "Model Output:") %>%
+#   body_add_par(value = "") %>%
+#   body_add_flextable(na.aut, align = "left") %>%
+#   body_add_par(value = "") %>%
+#   body_add_par(value = "Deviance Test:") %>%
+#   body_add_par(value = "") %>%
+#   body_add_flextable(na.aut.d, align = "left") %>%
+#   body_add_par(value = "")
+
+print(my_doc, target = "Output/tables.docx") %>% invisible()
+```
+
+# Compare RE across models
+
+```{r}
+re.sex.nt$subset <- "NT"
+re.sex.aut$subset <- "AUT"
+re.sex.mal$subset <- "M"
+re.sex.fem$subset <- "F"
+re.sex <- rbind(re.sex.nt, re.sex.aut, re.sex.mal, re.sex.fem)
+labs <- c("Between People (Intercept)", "Between People (Slope)", "Between Stimuli (Intercept)", "Residual")
+names(labs) <- c("sd_(Intercept)|id", "sd_ot1|id", 
+                 "sd_(Intercept)|scene2", "sigma")
+re.plot <- re.sex %>%
+  filter(term!="cor_ot1.(Intercept)|id" & term!="cor_ot2.(Intercept)|id" & term!="cor_ot2.ot1|id") %>%
+  mutate(subset=factor(subset, levels = c("NT", "AUT", "M", "F")),
+         term=factor(term, levels=c("sd_(Intercept)|id", "sd_ot1|id", 
+                 "sd_(Intercept)|scene2", "sigma"))) %>%
+  ggplot(aes(x=reorder(term, sdcor), y=sdcor, stat="identity", fill=term)) +
+  geom_errorbar(aes(ymax=`CI 97.5%`, ymin=`CI 2.5%`)) +
+  geom_col(position = "stack") +
+  facet_grid(~subset) +
+  scale_fill_manual(values = c("purple","blue","orange", "skyblue"), 
+                    name="Subset", 
+                    labels=c("Between People (Intercept)", "Between People (Slope)", "Between Scenes (Intercept)", "Residual")) +
+  labs(x="", y="Random Effect (SD)") +
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank())
+ggsave(filename = "Plots/re-plot.pdf", plot = re.plot)
+```
+```{r}
+re.plot2 <- re.sex %>%
+  filter(term!="cor_ot1.(Intercept)|id" & term!="cor_ot2.(Intercept)|id" & term!="cor_ot2.ot1|id") %>%
+  mutate(subset=factor(subset, levels = c("NT", "AUT", "M", "F")),
+         term=factor(term, levels=c("sd_(Intercept)|id", "sd_ot1|id", 
+                 "sd_ot2|id", "sd_(Intercept)|scene2", "sigma"))) %>%
+  ggplot(aes(x=subset, y=sdcor, stat="identity", fill=(term))) +
+  geom_col(position = position_fill(reverse = TRUE)) +
+
+  # facet_grid(~subset) +
+  scale_fill_manual(values = c("purple","blue","orange", "skyblue"), 
+                    name="Subset", 
+                    labels=c("Between People (Intercept)", "Between People (Slope)", "Between Scenes (Intercept)", "Residual")) +
+  labs(x="", y="Random Effect (SD)") 
+re.plot2
+ggsave(filename = "Plots/re-plot2.pdf", plot = re.plot2, width = 7, height = 7)
+```
+
+
+```{r}
+re.plot3 <- re.sex %>%
+  filter(term!="cor_ot1.(Intercept)|id" & term!="cor_ot2.(Intercept)|id" & term!="cor_ot2.ot1|id") %>%
+  mutate(subset=factor(subset, levels = c("NT", "AUT", "M", "F")),
+         term=factor(term, levels=c("sd_(Intercept)|id", "sd_ot1|id", 
+                 "sd_ot2|id", "sd_(Intercept)|scene2", "sigma"))) %>%
+  ggplot() +
+  
+  geom_col(aes(x=subset, y=`CI 97.5%`, stat="identity", fill=(term)),
+           position = position_fill(reverse = TRUE)) +
+  # geom_col(aes(x=subset, y=sdcor, stat="identity", fill=(term)),
+           # position = position_fill(reverse = TRUE), alpha=0.7) +
+  # geom_col(aes(x=subset, y=`CI 2.5%`, stat="identity", fill=(term)),
+  #          position = position_fill(reverse = TRUE)) +
+
+  # facet_grid(~subset) +
+  scale_fill_manual(values = c("purple","blue","orange", "skyblue"), 
+                    name="Subset", 
+                    labels=c("Between People (Intercept)", "Between People (Slope)", "Between Scenes (Intercept)", "Residual")) +
+  labs(x="", y="Random Effect (SD)") 
+re.plot3
+ggsave(filename = "Plots/re-plot3.pdf", plot = re.plot3)
+```
+
+```{r}
+# re.sex.nt$subset <- "NT"
+# re.sex.aut$subset <- "AUT"
+# re.sex.mal$subset <- "M"
+# re.sex.fem$subset <- "F"
+# 
+# re.sex <- rbind(re.sex.nt, re.sex.aut, re.sex.mal, re.sex.fem)
+# 
+# labs <- c("Between People (Intercept)", "Between People (Slope)", "Between Scenes (Intercept)", "Residual")
+# names(labs) <- c("sd_(Intercept)|id", "sd_ot1|id", "sd_(Intercept)|scene2", "sigma")
+# 
+# re.plot <- re.sex %>%
+#   filter(term!="cor_ot1.(Intercept)|id") %>%
+#   mutate(subset=factor(subset, levels = c("NT", "AUT", "M", "F")),
+#          term=factor(term, levels=c("sd_(Intercept)|id", "sd_ot1|id", "sd_(Intercept)|scene2", "sigma"))) %>%
+#   ggplot() +
+#   geom_pointrange(aes(x=subset, y=sdcor, 
+#                       ymin=`CI 2.5%`, ymax=`CI 97.5%`, 
+#                       fill=subset),
+#                   shape=23) +
+#   facet_wrap(~term, scales = "free_y", labeller = labeller(term = labs)) +
+#   scale_fill_manual(values = c("purple","blue","yellow","orange"), 
+#                     name="Term and Subset") +
+#   labs(x="", y="Random Effect (SD)") +
+#   theme(axis.text.x = element_blank(),
+#         axis.ticks.x = element_blank())
+# ggsave(filename = "Plots/re-plot.pdf", plot = re.plot)
+```
+
+# Save WS
+
+```{r}
+save.image(file = "Data/SavedWS/mod-sel.RData")
+```
